@@ -1,0 +1,59 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="UTF-8">
+  <title>GPT Demo</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      background: #0f172a;
+      color: #e2e8f0;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      height: 100vh;
+      margin: 0;
+    }
+    button {
+      padding: 12px 20px;
+      margin-top: 20px;
+      font-size: 16px;
+      border: none;
+      border-radius: 8px;
+      background: #22c55e;
+      color: black;
+      cursor: pointer;
+    }
+    .box {
+      max-width: 500px;
+      text-align: center;
+    }
+  </style>
+</head>
+<body>
+  <div class="box">
+    <h1>🚀 GPT Demo</h1>
+    <p>Ich kann nicht nur reden – ich kann bauen.</p>
+
+    <button onclick="generate()">Mission generieren</button>
+
+    <p id="output"></p>
+  </div>
+
+  <script>
+    const missions = [
+      "Baue eine API in 10 Minuten",
+      "Debugge ein kaputtes Angular Frontend",
+      "Erkläre Mathe so, dass ein Erstsemester es versteht",
+      "Optimiere deinen Code brutal effizient",
+      "Finde den Fehler, den du seit 2h suchst"
+    ];
+
+    function generate() {
+      const random = missions[Math.floor(Math.random() * missions.length)];
+      document.getElementById("output").innerText = random;
+    }
+  </script>
+</body>
+</html>
