@@ -7,6 +7,7 @@ A small Python project that downloads YouTube audio, transcribes German speech w
 ## Features
 
 - Reads YouTube links from a plain text file
+- Can auto-extract all uploaded video links from a YouTube channel URL
 - Downloads and converts audio to WAV using `yt-dlp` + ffmpeg
 - Transcribes with WhisperX + word-level alignment
 - Performs diarization and overlap filtering
@@ -19,6 +20,7 @@ A small Python project that downloads YouTube audio, transcribes German speech w
 ```text
 .
 ├── app.py
+├── extract_channel_links.py
 ├── requirements.txt
 ├── .env.example
 ├── youtube_links.example.txt
@@ -63,6 +65,18 @@ HF_TOKEN=hf_xxx
 
 - Copy `youtube_links.example.txt` to `youtube_links.txt` and add one YouTube URL per line.
 - Copy `voice_db.example.json` to `voice_db.json` and add your real target embedding values.
+
+Optional: generate `youtube_links.txt` automatically from a full YouTube channel:
+
+```bash
+python extract_channel_links.py "https://www.youtube.com/@channel_handle/videos"
+```
+
+By default this overwrites `youtube_links.txt`. To append instead:
+
+```bash
+python extract_channel_links.py "https://www.youtube.com/@channel_handle/videos" --append
+```
 
 ### 4) Run
 
