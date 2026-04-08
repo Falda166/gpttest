@@ -66,7 +66,7 @@ HF_TOKEN=hf_xxx
 - Copy `youtube_links.example.txt` to `youtube_links.txt` and add one YouTube URL per line.
 - Copy `voice_db.example.json` to `voice_db.json` and add your real target embedding values.
 
-Optional: generate `youtube_links.txt` automatically from a YouTube channel URL (both `@handle` and `@handle/videos` are supported):
+Optional: generate `youtube_links.txt` automatically from a full YouTube channel:
 
 ```bash
 python extract_channel_links.py "https://www.youtube.com/@channel_handle/videos"
@@ -77,8 +77,6 @@ By default this overwrites `youtube_links.txt`. To append instead:
 ```bash
 python extract_channel_links.py "https://www.youtube.com/@channel_handle/videos" --append
 ```
-
-If you unexpectedly get very few links, retry with the explicit `/videos` URL form.
 
 ### 4) Run
 

@@ -1,39 +1,22 @@
 import argparse
-import re
 from pathlib import Path
 
 import yt_dlp
 
 
-def _normalize_channel_url(channel_url: str) -> str:
-    return channel_url.rstrip("/")
-
-
-def _candidate_urls(channel_url: str) -> list[str]:
-    base = _normalize_channel_url(channel_url)
-    candidates = [base]
-
-    if not re.search(r"/(videos|streams|playlists)$", base):
-        candidates.append(f"{base}/videos")
-
-    return candidates
-
-
-def _extract_info(url: str, *, flat: bool) -> dict:
+def extract_video_links(channel_url: str) -> list[str]:
+    """Extract all video URLs from a YouTube channel/uploads feed."""
     ydl_opts = {
         "quiet": True,
         "no_warnings": True,
-        "extract_flat": "in_playlist" if flat else False,
+        "extract_flat": True,
         "skip_download": True,
         "lazy_playlist": False,
-        "playlistend": 1_000_000,
     }
 
     with yt_dlp.YoutubeDL(ydl_opts) as ydl:
-        return ydl.extract_info(url, download=False)
+        info = ydl.extract_info(channel_url, download=False)
 
-
-def _info_to_video_urls(info: dict) -> list[str]:
     entries = info.get("entries") or []
     urls: list[str] = []
     seen = set()
@@ -60,62 +43,6 @@ def _info_to_video_urls(info: dict) -> list[str]:
             urls.append(video_url)
 
     return urls
-
-
-def _uploads_playlist_from_channel_id(channel_id: str) -> str | None:
-    if channel_id and channel_id.startswith("UC") and len(channel_id) > 2:
-        return f"https://www.youtube.com/playlist?list=UU{channel_id[2:]}"
-    return None
-
-
-def _resolve_channel_id(channel_url: str) -> str | None:
-    """
-    Resolve a stable UC... channel id from various YouTube channel URL formats.
-    """
-    for candidate in _candidate_urls(channel_url):
-        try:
-            info = _extract_info(candidate, flat=False)
-        except Exception:
-            continue
-
-        channel_id = info.get("channel_id") or info.get("id")
-        if isinstance(channel_id, str) and channel_id.startswith("UC"):
-            return channel_id
-
-    return None
-
-
-def extract_video_links(channel_url: str) -> list[str]:
-    """Extract all uploaded video URLs from a YouTube channel URL."""
-    best_links: list[str] = []
-
-    for candidate in _candidate_urls(channel_url):
-        try:
-            info = _extract_info(candidate, flat=True)
-            links = _info_to_video_urls(info)
-            if len(links) > len(best_links):
-                best_links = links
-        except Exception:
-            pass
-
-    channel_id = _resolve_channel_id(channel_url)
-    if channel_id:
-        fallback_urls = [
-            f"https://www.youtube.com/channel/{channel_id}/videos",
-            _uploads_playlist_from_channel_id(channel_id),
-        ]
-        for fallback_url in fallback_urls:
-            if not fallback_url:
-                continue
-            try:
-                info = _extract_info(fallback_url, flat=True)
-                links = _info_to_video_urls(info)
-                if len(links) > len(best_links):
-                    best_links = links
-            except Exception:
-                pass
-
-    return best_links
 
 
 def write_links(links: list[str], out_file: Path, append: bool) -> None:
