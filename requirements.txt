@@ -1,0 +1,9 @@
+numpy>=1.26
+pandas>=2.2
+torch>=2.2
+soundfile>=0.12
+yt-dlp>=2025.1.15
+whisperx>=3.3
+colorama>=0.4
+pyannote.audio>=3.3
+python-dotenv>=1.0
