@@ -52,6 +52,21 @@ def download_audio(url: str, target_wav: Path, overwrite=True):
         raise FileNotFoundError(f"Audio-Datei wurde nicht erzeugt: {target_wav}")
 
 
+def fetch_video_duration_seconds(url: str):
+    ydl_opts = {
+        "quiet": True,
+        "no_warnings": True,
+        "noplaylist": True,
+        "skip_download": True,
+    }
+    with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+        info = ydl.extract_info(url, download=False)
+    duration = info.get("duration")
+    if duration is None:
+        return None
+    return float(duration)
+
+
 def _rms_envelope(signal: np.ndarray, frame_size: int, hop_size: int) -> np.ndarray:
     if signal.size < frame_size:
         pad = np.zeros(frame_size - signal.size, dtype=np.float32)

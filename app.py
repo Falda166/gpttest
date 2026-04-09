@@ -13,12 +13,13 @@ from pyannote.audio import Pipeline
 from pyannote.audio.pipelines.speaker_verification import SpeakerEmbedding
 
 from analyzer import config
-from analyzer.audio_processing import cleanup_audio_files
+from analyzer.audio_processing import cleanup_audio_files, fetch_video_duration_seconds
 from analyzer.csv_cleanup import CsvCleaner
 from analyzer.embedding_cache import EmbeddingCache
 from analyzer.helpers import read_links_from_txt, extract_embedding
 from analyzer.logging_utils import timed_step, log_info, log_ok, log_error, log_warn, fmt_seconds, log_step
 from analyzer.pipeline import process_single_video
+from analyzer.progress_tracking import RuntimeEstimator
 from analyzer.runtime import configure_runtime, resolve_device
 from analyzer.speaker_style import compare_speakers
 from analyzer.time_analysis import word_frequency_over_time
@@ -49,6 +50,19 @@ def main():
 
     links = timed_step("Links aus TXT laden", read_links_from_txt, config.INPUT_LINKS_FILE)
     log_info(f"{len(links)} Links geladen")
+
+    durations = []
+    log_step("Video-Längen laden (für ETA)")
+    for i, link in enumerate(links, start=1):
+        try:
+            d = fetch_video_duration_seconds(link)
+            durations.append(d)
+        except Exception:
+            durations.append(None)
+            log_warn(f"Länge für Video {i} konnte nicht geladen werden")
+    known_durations = sum(1 for d in durations if d is not None)
+    log_ok(f"Video-Längen geladen: {known_durations}/{len(links)} bekannt")
+    runtime_estimator = RuntimeEstimator(total_videos=len(links), planned_durations_seconds=durations)
 
     log_step("voice_db.json laden")
     t0 = time.time()
@@ -126,6 +140,7 @@ def main():
         raw_audio_file = config.AUDIO_DIR / f"audio_{idx}.wav"
         cleaned_audio_file = config.CLEAN_AUDIO_DIR / f"audio_{idx}_cleaned.wav"
         target_audio_file = config.CLEAN_AUDIO_DIR / f"audio_{idx}_cleaned_target.wav"
+        result = None
 
         try:
             result = process_single_video(
@@ -163,6 +178,17 @@ def main():
             log_ok("Temporäre Audio-Dateien gelöscht")
 
         loop_dt = time.time() - loop_start
+        video_seconds = durations[idx - 1]
+        if video_seconds is None:
+            video_seconds = float(result.get("source_audio_seconds", 0.0)) if isinstance(result, dict) else 0.0
+        runtime_estimator.update(
+            video_idx=idx,
+            video_seconds=video_seconds,
+            processing_seconds=loop_dt,
+        )
+        total_elapsed = time.time() - total_start
+        log_info(runtime_estimator.render_progress_line(idx, total_elapsed))
+        log_info(f"Laufzeitformel aktuell: {runtime_estimator.formula_text()}")
         log_info(f"Video {idx}/{total_links} abgeschlossen in {fmt_seconds(loop_dt)}")
 
     log_step("CSV schreiben")
@@ -199,6 +225,12 @@ def main():
     run_optional_step("Speaker Style exportieren", compare_speakers, {k: dict(v) for k, v in global_speaker_counts.items()}, config.SPEAKER_STYLE_CSV_FILE)
     run_optional_step("Word Timeline speichern", word_frequency_over_time, timeline_words, config.WORD_TIMELINE_HTML)
     run_optional_step("Word Timeline (plots/) speichern", word_frequency_over_time, timeline_words, config.WORD_TIMELINE_PLOT_HTML)
+    run_optional_step(
+        "Runtime-Schätzung exportieren",
+        runtime_estimator.export,
+        config.RUNTIME_ESTIMATION_CSV,
+        config.RUNTIME_ESTIMATION_HTML,
+    )
 
     dt = time.time() - t0
     log_ok(f"CSV/NLP-Ausgaben geschrieben in {fmt_seconds(dt)}")

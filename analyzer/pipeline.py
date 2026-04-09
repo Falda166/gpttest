@@ -97,11 +97,27 @@ def process_single_video(
 
     if best_speaker is None:
         log_warn("Kein passender Speaker gefunden, Video wird übersprungen.")
-        return {"words": [], "transcript": "", "timed_words": [], "speaker_word_counts": {}} if return_metadata else []
+        return {
+            "words": [],
+            "transcript": "",
+            "timed_words": [],
+            "speaker_word_counts": {},
+            "source_audio_seconds": cleaning_stats["original_seconds"],
+            "target_audio_seconds": 0.0,
+            "processing_seconds": time.time() - video_start,
+        } if return_metadata else []
 
     if best_score < config.MIN_ACCEPT_SCORE:
         log_warn(f"Score zu niedrig ({best_score:.3f}) -> Video übersprungen")
-        return {"words": [], "transcript": "", "timed_words": [], "speaker_word_counts": {}} if return_metadata else []
+        return {
+            "words": [],
+            "transcript": "",
+            "timed_words": [],
+            "speaker_word_counts": {},
+            "source_audio_seconds": cleaning_stats["original_seconds"],
+            "target_audio_seconds": 0.0,
+            "processing_seconds": time.time() - video_start,
+        } if return_metadata else []
 
     label = classify_score(best_score, config.MATCH_THRESHOLD_STRONG, config.MATCH_THRESHOLD_MAYBE)
     log_ok(f"Match: {best_speaker} ({best_score:.3f}, {label})")
@@ -152,7 +168,15 @@ def process_single_video(
 
     if target_audio_stats["segments"] == 0 or target_audio_stats["output_seconds"] < config.MIN_SEGMENT_SECONDS:
         log_warn("Zu wenig Target-Speaker Audio gefunden, Video wird übersprungen.")
-        return {"words": [], "transcript": "", "timed_words": [], "speaker_word_counts": {}} if return_metadata else []
+        return {
+            "words": [],
+            "transcript": "",
+            "timed_words": [],
+            "speaker_word_counts": {},
+            "source_audio_seconds": cleaning_stats["original_seconds"],
+            "target_audio_seconds": target_audio_stats["output_seconds"],
+            "processing_seconds": time.time() - video_start,
+        } if return_metadata else []
 
     log_ok(
         "Target-Audio erstellt: "
@@ -233,6 +257,9 @@ def process_single_video(
             "transcript": transcript_text,
             "timed_words": transcript_words,
             "speaker_word_counts": speaker_word_counts,
+            "source_audio_seconds": cleaning_stats["original_seconds"],
+            "target_audio_seconds": target_audio_stats["output_seconds"],
+            "processing_seconds": total_video_time,
         }
 
     return accepted_words
