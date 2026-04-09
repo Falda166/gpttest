@@ -23,6 +23,8 @@ WORD_CLUSTERS_HTML = OUTPUT_DIR / "word_clusters.html"
 WORD_CLUSTERS_PLOT_HTML = PLOTS_DIR / "word_clusters.html"
 WORD_TIMELINE_HTML = OUTPUT_DIR / "word_timeline.html"
 WORD_TIMELINE_PLOT_HTML = PLOTS_DIR / "word_timeline.html"
+RUNTIME_ESTIMATION_CSV = CSV_DIR / "runtime_estimation.csv"
+RUNTIME_ESTIMATION_HTML = PLOTS_DIR / "runtime_estimation.html"
 
 EMBEDDINGS_CACHE_FILE = CACHE_DIR / "embeddings.pkl"
 

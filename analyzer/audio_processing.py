@@ -52,6 +52,21 @@ def download_audio(url: str, target_wav: Path, overwrite=True):
         raise FileNotFoundError(f"Audio-Datei wurde nicht erzeugt: {target_wav}")
 
 
+def fetch_video_duration_seconds(url: str):
+    ydl_opts = {
+        "quiet": True,
+        "no_warnings": True,
+        "noplaylist": True,
+        "skip_download": True,
+    }
+    with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+        info = ydl.extract_info(url, download=False)
+    duration = info.get("duration")
+    if duration is None:
+        return None
+    return float(duration)
+
+
 def _rms_envelope(signal: np.ndarray, frame_size: int, hop_size: int) -> np.ndarray:
     if signal.size < frame_size:
         pad = np.zeros(frame_size - signal.size, dtype=np.float32)
@@ -167,6 +182,69 @@ def remove_silence_from_audio(
         "cleaned_seconds": cleaned_seconds,
         "removed_seconds": max(0.0, original_seconds - cleaned_seconds),
         "regions": len(speech_regions),
+    }
+
+
+def extract_time_regions_to_audio(
+    input_wav: Path,
+    output_wav: Path,
+    regions,
+    min_region_seconds: float = 0.0,
+):
+    audio, sr = sf.read(input_wav, always_2d=True, dtype="float32")
+    total_seconds = len(audio) / sr if sr > 0 else 0.0
+
+    normalized_regions = []
+    for start, end in regions:
+        start = max(0.0, float(start))
+        end = min(total_seconds, float(end))
+        if end <= start:
+            continue
+        if (end - start) < float(min_region_seconds):
+            continue
+        normalized_regions.append((start, end))
+
+    if not normalized_regions:
+        sf.write(output_wav, np.zeros((0, audio.shape[1]), dtype=np.float32), sr)
+        return {
+            "segments": 0,
+            "source_seconds": total_seconds,
+            "output_seconds": 0.0,
+            "mapping": [],
+        }
+
+    pieces = []
+    mapping = []
+    out_cursor = 0.0
+
+    for start, end in normalized_regions:
+        s = int(start * sr)
+        e = int(end * sr)
+        chunk = audio[s:e]
+        if chunk.size == 0:
+            continue
+        pieces.append(chunk)
+        chunk_seconds = len(chunk) / sr
+        mapping.append({
+            "source_start": start,
+            "source_end": end,
+            "target_start": out_cursor,
+            "target_end": out_cursor + chunk_seconds,
+        })
+        out_cursor += chunk_seconds
+
+    if pieces:
+        out_audio = np.concatenate(pieces, axis=0)
+    else:
+        out_audio = np.zeros((0, audio.shape[1]), dtype=np.float32)
+
+    sf.write(output_wav, out_audio, sr)
+
+    return {
+        "segments": len(mapping),
+        "source_seconds": total_seconds,
+        "output_seconds": out_cursor,
+        "mapping": mapping,
     }
 
 
