@@ -1,0 +1,7 @@
+# Konfliktvermeidung: Bei Merges immer die aktuelle Branch-Version behalten
+app.py merge=ours
+requirements.txt merge=ours
+README.md merge=ours
+config.yaml merge=ours
+dashboard.py merge=ours
+analyzer/*.py merge=ours
