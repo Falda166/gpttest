@@ -9,17 +9,30 @@ A small Python project that downloads YouTube audio, transcribes German speech w
 - Reads YouTube links from a plain text file
 - Can auto-extract all uploaded video links from a YouTube channel URL
 - Downloads and converts audio to WAV using `yt-dlp` + ffmpeg
+- Cleans audio by removing silent sections before ASR/diarization
 - Transcribes with WhisperX + word-level alignment
 - Performs diarization and overlap filtering
 - Matches a known reference voice embedding (e.g. `papaplatte`) against detected speakers
+- Applies 2-step CSV cleanup (rule-based + semantic merge with multilingual MPNet)
 - Outputs cleaned word counts to `output/word_frequency.csv`
 - Colorized step-by-step logs with duration tracking
+- Runtime tweaks for cleaner logs (optional warning filters + TF32 enable)
 
 ## Project Structure
 
 ```text
 .
 ├── app.py
+├── analyzer/
+│   ├── config.py
+│   ├── audio_processing.py
+│   ├── speaker_processing.py
+│   ├── text_processing.py
+│   ├── helpers.py
+│   ├── logging_utils.py
+│   ├── csv_cleanup.py
+│   ├── runtime.py
+│   └── pipeline.py
 ├── extract_channel_links.py
 ├── requirements.txt
 ├── .env.example
@@ -36,6 +49,7 @@ A small Python project that downloads YouTube audio, transcribes German speech w
 - ffmpeg installed and available in `PATH`
 - Hugging Face access token (`HF_TOKEN`) with access to required pyannote models
 - GPU is recommended but optional
+- Additional model for CSV cleanup: `sentence-transformers/paraphrase-multilingual-mpnet-base-v2`
 
 ## Quick Start
 
@@ -72,10 +86,30 @@ Optional: generate `youtube_links.txt` automatically from a full YouTube channel
 python extract_channel_links.py "https://www.youtube.com/@channel_handle/videos"
 ```
 
+Standardmäßig werden jetzt alle verfügbaren Uploads gezogen.
+
+Nur die ersten 25 Links ziehen:
+
+```bash
+python extract_channel_links.py "https://www.youtube.com/@channel_handle" -n 25
+```
+
+Alle verfügbaren Links ziehen:
+
+```bash
+python extract_channel_links.py "https://www.youtube.com/@channel_handle" --all
+```
+
 By default this overwrites `youtube_links.txt`. To append instead:
 
 ```bash
 python extract_channel_links.py "https://www.youtube.com/@channel_handle/videos" --append
+```
+
+Wenn ein Umgebungs-Proxy Probleme macht:
+
+```bash
+python extract_channel_links.py "https://www.youtube.com/@channel_handle" --no-proxy
 ```
 
 ### 4) Run
@@ -118,3 +152,27 @@ The embedding vector should be a 1D float vector from the same (or compatible) s
 ## License
 
 MIT — see [LICENSE](LICENSE).
+
+
+## Full NLP Extension
+
+Neue Module und Outputs:
+
+- `analyzer/visualization.py` -> `output/word_clusters.html`
+- `analyzer/word_clustering.py` -> semantische Wort-Normalisierung mit HDBSCAN
+- `analyzer/topic_detection.py` -> `output/csv/video_topics.csv`
+- `analyzer/video_similarity.py` -> `output/csv/video_similarity.csv`
+- `analyzer/speaker_style.py` -> `output/csv/speaker_style.csv`
+- `analyzer/time_analysis.py` -> `output/word_timeline.html`
+- `analyzer/embedding_cache.py` -> `cache/embeddings.pkl`
+- `dashboard.py` -> Streamlit Dashboard mit 6 Tabs
+
+Start Dashboard:
+
+```bash
+streamlit run dashboard.py
+```
+
+## Merge-Konflikte vermeiden
+
+Für die Kern-Dateien ist in `.gitattributes` `merge=ours` gesetzt, damit bei Merges standardmäßig die aktuelle Branch-Version behalten wird ("einfach überschreiben").
