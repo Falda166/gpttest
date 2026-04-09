@@ -1,5 +1,6 @@
 import json
 import os
+import shutil
 import time
 from collections import Counter
 
@@ -17,7 +18,7 @@ from analyzer.audio_processing import cleanup_audio_files, fetch_video_duration_
 from analyzer.csv_cleanup import CsvCleaner
 from analyzer.embedding_cache import EmbeddingCache
 from analyzer.helpers import read_links_from_txt, extract_embedding
-from analyzer.logging_utils import timed_step, log_info, log_ok, log_error, log_warn, fmt_seconds, log_step
+from analyzer.logging_utils import timed_step, log_info, log_ok, log_error, log_warn, fmt_seconds, log_step, draw_bottom_panel
 from analyzer.pipeline import process_single_video
 from analyzer.progress_tracking import RuntimeEstimator
 from analyzer.runtime import configure_runtime, resolve_device
@@ -63,6 +64,8 @@ def main():
     known_durations = sum(1 for d in durations if d is not None)
     log_ok(f"Video-Längen geladen: {known_durations}/{len(links)} bekannt")
     runtime_estimator = RuntimeEstimator(total_videos=len(links), planned_durations_seconds=durations)
+    panel_width = max(40, shutil.get_terminal_size((24, 120)).columns - 8)
+    draw_bottom_panel(runtime_estimator.render_progress_panel(0, 0.0, bar_width=panel_width))
 
     log_step("voice_db.json laden")
     t0 = time.time()
@@ -187,6 +190,7 @@ def main():
             processing_seconds=loop_dt,
         )
         total_elapsed = time.time() - total_start
+        draw_bottom_panel(runtime_estimator.render_progress_panel(idx, total_elapsed, bar_width=panel_width))
         log_info(runtime_estimator.render_progress_line(idx, total_elapsed))
         log_info(f"Laufzeitformel aktuell: {runtime_estimator.formula_text()}")
         log_info(f"Video {idx}/{total_links} abgeschlossen in {fmt_seconds(loop_dt)}")
@@ -236,6 +240,7 @@ def main():
     log_ok(f"CSV/NLP-Ausgaben geschrieben in {fmt_seconds(dt)}")
 
     total_dt = time.time() - total_start
+    draw_bottom_panel(runtime_estimator.render_progress_panel(total_links, total_dt, bar_width=panel_width))
     print()
     log_ok(f"Gesamt fertig in {fmt_seconds(total_dt)}")
     log_info(f"Unique Wörter gesamt: {len(total_counter)}")

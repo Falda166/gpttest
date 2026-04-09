@@ -7,6 +7,7 @@ from typing import Optional
 import numpy as np
 import pandas as pd
 import plotly.express as px
+from colorama import Fore, Style
 
 
 def _fmt_hms(seconds: float) -> str:
@@ -72,6 +73,32 @@ class RuntimeEstimator:
             f"[{bar}] {pct:5.1f}% | Videos: {processed_count}/{self.total_videos} | "
             f"Elapsed: {_fmt_hms(elapsed_seconds)} | ETA: {_fmt_hms(eta)}"
         )
+
+    def render_progress_panel(self, processed_count: int, elapsed_seconds: float, bar_width: int = 80) -> list[str]:
+        pct = self.progress_percent(processed_count)
+        width = max(20, int(bar_width))
+        filled = int(round((pct / 100.0) * width))
+        filled = min(width, max(0, filled))
+        empty = width - filled
+
+        bar = (
+            f"{Fore.MAGENTA}{'█' * filled}"
+            f"{Fore.WHITE}{'░' * empty}"
+            f"{Style.RESET_ALL}"
+        )
+        eta = self.estimate_remaining_seconds(processed_count)
+
+        top = f"{Fore.CYAN}{Style.BRIGHT}╔{'═' * (width + 2)}╗{Style.RESET_ALL}"
+        middle = f"{Fore.CYAN}{Style.BRIGHT}║{Style.RESET_ALL} {bar} {Fore.CYAN}{Style.BRIGHT}║{Style.RESET_ALL}"
+        bottom = f"{Fore.CYAN}{Style.BRIGHT}╚{'═' * (width + 2)}╝{Style.RESET_ALL}"
+        status = (
+            f"{Fore.YELLOW}{Style.BRIGHT}Fortschritt:{Style.RESET_ALL} "
+            f"{Fore.GREEN}{pct:5.1f}%{Style.RESET_ALL} | "
+            f"Videos {processed_count}/{self.total_videos} | "
+            f"Elapsed {_fmt_hms(elapsed_seconds)} | "
+            f"ETA {_fmt_hms(eta)}"
+        )
+        return [top, middle, bottom, status]
 
     def formula_text(self) -> str:
         intercept, slope = self.fit()
