@@ -86,6 +86,8 @@ Optional: generate `youtube_links.txt` automatically from a full YouTube channel
 python extract_channel_links.py "https://www.youtube.com/@channel_handle/videos"
 ```
 
+Standardmäßig werden jetzt alle verfügbaren Uploads gezogen.
+
 Nur die ersten 25 Links ziehen:
 
 ```bash

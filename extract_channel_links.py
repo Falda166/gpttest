@@ -106,8 +106,8 @@ def main():
         "-n",
         "--max-links",
         type=int,
-        default=100,
-        help="Maximale Anzahl Links (default: 100).",
+        default=None,
+        help="Maximale Anzahl Links (standard: alle verfügbaren).",
     )
     parser.add_argument(
         "--all",
