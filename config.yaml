@@ -1,0 +1,10 @@
+embedding_model: sentence-transformers/paraphrase-multilingual-mpnet-base-v2
+
+clustering:
+  min_cluster_size: 2
+
+visualization:
+  enabled: true
+
+topics:
+  enabled: true
