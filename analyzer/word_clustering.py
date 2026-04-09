@@ -11,9 +11,17 @@ def cluster_words(words: list[str], embedding_cache: EmbeddingCache, min_cluster
         return [], np.array([], dtype=int)
 
     unique_words = list(dict.fromkeys(words))
+    if len(unique_words) < 2:
+        return unique_words, np.array([-1] * len(unique_words), dtype=int)
+
+    min_cluster_size = max(2, min(min_cluster_size, len(unique_words)))
+
     embeddings = embedding_cache.encode(unique_words)
     similarity = embeddings @ embeddings.T
     distance = 1.0 - np.clip(similarity, -1.0, 1.0)
+
+    # hdbscan (cython path) erwartet float64 / contiguous für precomputed distances
+    distance = np.asarray(distance, dtype=np.float64, order="C")
 
     clusterer = hdbscan.HDBSCAN(min_cluster_size=min_cluster_size, metric="precomputed")
     labels = clusterer.fit_predict(distance)
