@@ -86,10 +86,28 @@ Optional: generate `youtube_links.txt` automatically from a full YouTube channel
 python extract_channel_links.py "https://www.youtube.com/@channel_handle/videos"
 ```
 
+Nur die ersten 25 Links ziehen:
+
+```bash
+python extract_channel_links.py "https://www.youtube.com/@channel_handle" -n 25
+```
+
+Alle verfügbaren Links ziehen:
+
+```bash
+python extract_channel_links.py "https://www.youtube.com/@channel_handle" --all
+```
+
 By default this overwrites `youtube_links.txt`. To append instead:
 
 ```bash
 python extract_channel_links.py "https://www.youtube.com/@channel_handle/videos" --append
+```
+
+Wenn ein Umgebungs-Proxy Probleme macht:
+
+```bash
+python extract_channel_links.py "https://www.youtube.com/@channel_handle" --no-proxy
 ```
 
 ### 4) Run
