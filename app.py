@@ -88,6 +88,10 @@ def main():
     total_counter = Counter()
     total_links = len(links)
 
+    video_texts = {}
+    timeline_words = []
+    global_speaker_counts = defaultdict(Counter)
+
     for idx, url in enumerate(links, start=1):
         loop_start = time.time()
         print()
@@ -97,7 +101,7 @@ def main():
         cleaned_audio_file = config.CLEAN_AUDIO_DIR / f"audio_{idx}_cleaned.wav"
 
         try:
-            words = process_single_video(
+            result = process_single_video(
                 url=url,
                 raw_audio_file=raw_audio_file,
                 cleaned_audio_file=cleaned_audio_file,
@@ -111,7 +115,14 @@ def main():
                 device_str=device_str,
             )
 
+            words = result["words"]
             total_counter.update(words)
+            video_texts[f"video_{idx}"] = result["transcript"]
+            timeline_words.extend(result["timed_words"])
+
+            for speaker, counts in result["speaker_word_counts"].items():
+                global_speaker_counts[speaker].update(counts)
+
             log_ok(f"Aktueller Wortschatz: {len(total_counter)} unique Wörter")
 
         except Exception as e:

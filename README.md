@@ -16,6 +16,7 @@ A small Python project that downloads YouTube audio, transcribes German speech w
 - Applies 2-step CSV cleanup (rule-based + semantic merge with multilingual MPNet)
 - Outputs cleaned word counts to `output/word_frequency.csv`
 - Colorized step-by-step logs with duration tracking
+- Runtime tweaks for cleaner logs (optional warning filters + TF32 enable)
 
 ## Project Structure
 
@@ -130,3 +131,23 @@ The embedding vector should be a 1D float vector from the same (or compatible) s
 ## License
 
 MIT — see [LICENSE](LICENSE).
+
+
+## Full NLP Extension
+
+Neue Module und Outputs:
+
+- `analyzer/visualization.py` -> `output/word_clusters.html`
+- `analyzer/word_clustering.py` -> semantische Wort-Normalisierung mit HDBSCAN
+- `analyzer/topic_detection.py` -> `output/csv/video_topics.csv`
+- `analyzer/video_similarity.py` -> `output/csv/video_similarity.csv`
+- `analyzer/speaker_style.py` -> `output/csv/speaker_style.csv`
+- `analyzer/time_analysis.py` -> `output/word_timeline.html`
+- `analyzer/embedding_cache.py` -> `cache/embeddings.pkl`
+- `dashboard.py` -> Streamlit Dashboard mit 6 Tabs
+
+Start Dashboard:
+
+```bash
+streamlit run dashboard.py
+```
