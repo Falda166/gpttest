@@ -31,6 +31,7 @@ A small Python project that downloads YouTube audio, transcribes German speech w
 │   ├── helpers.py
 │   ├── logging_utils.py
 │   ├── csv_cleanup.py
+│   ├── runtime.py
 │   └── pipeline.py
 ├── extract_channel_links.py
 ├── requirements.txt
@@ -151,3 +152,7 @@ Start Dashboard:
 ```bash
 streamlit run dashboard.py
 ```
+
+## Merge-Konflikte vermeiden
+
+Für die Kern-Dateien ist in `.gitattributes` `merge=ours` gesetzt, damit bei Merges standardmäßig die aktuelle Branch-Version behalten wird ("einfach überschreiben").
