@@ -7,3 +7,4 @@ whisperx>=3.3
 colorama>=0.4
 pyannote.audio>=3.3
 python-dotenv>=1.0
+sentence-transformers>=3.0
