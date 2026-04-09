@@ -1,7 +1,34 @@
+import atexit
 import time
-from colorama import init, Fore, Style
 
-init(autoreset=True)
+from colorama import init
+
+from analyzer.terminal_ui import ConsoleManager
+
+init()
+
+_CONSOLE = ConsoleManager()
+atexit.register(_CONSOLE.finish)
+
+
+def configure_console(
+    footer_enabled: bool = True,
+    refresh_interval: float = 0.1,
+    footer_height: int = 3,
+):
+    _CONSOLE.configure(
+        footer_enabled=footer_enabled,
+        refresh_interval=refresh_interval,
+        footer_height=footer_height,
+    )
+
+
+def get_console_manager() -> ConsoleManager:
+    return _CONSOLE
+
+
+def finish_console():
+    _CONSOLE.finish()
 
 
 def fmt_seconds(seconds: float) -> str:
@@ -13,29 +40,35 @@ def fmt_seconds(seconds: float) -> str:
 
 
 def log_info(msg: str):
-    print(f"{Fore.CYAN}[INFO]{Style.RESET_ALL} {msg}")
+    _CONSOLE.log("info", msg)
 
 
 def log_step(msg: str):
-    print(f"{Fore.BLUE}[STEP]{Style.RESET_ALL} {msg}")
+    _CONSOLE.set_step(msg)
+    _CONSOLE.log("step", msg)
 
 
 def log_ok(msg: str):
-    print(f"{Fore.GREEN}[ OK ]{Style.RESET_ALL} {msg}")
+    _CONSOLE.log("ok", msg)
 
 
 def log_warn(msg: str):
-    print(f"{Fore.YELLOW}[WARN]{Style.RESET_ALL} {msg}")
+    _CONSOLE.log("warn", msg)
 
 
 def log_error(msg: str):
-    print(f"{Fore.RED}[ERR ]{Style.RESET_ALL} {msg}")
+    _CONSOLE.log("error", msg)
 
 
 def timed_step(label: str, func, *args, **kwargs):
+    _CONSOLE.set_step(label)
     log_step(label)
     t0 = time.time()
-    result = func(*args, **kwargs)
+    try:
+        result = func(*args, **kwargs)
+    except Exception as exc:
+        _CONSOLE.set_detail(f"{label} fehlgeschlagen: {exc}", level="error")
+        raise
     dt = time.time() - t0
     log_ok(f"{label} fertig in {fmt_seconds(dt)}")
     return result

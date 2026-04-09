@@ -20,6 +20,16 @@ def _fmt_hms(seconds: float) -> str:
 
 
 @dataclass
+class RuntimeSnapshot:
+    processed_count: int
+    total_videos: int
+    percent: float
+    elapsed_seconds: float
+    eta_seconds: float
+    formula: str
+
+
+@dataclass
 class RuntimeEstimator:
     total_videos: int
     planned_durations_seconds: list[Optional[float]]
@@ -48,14 +58,22 @@ class RuntimeEstimator:
         slope, intercept = np.polyfit(x, y, 1)
         return float(intercept), max(1e-6, float(slope))
 
-    def estimate_remaining_seconds(self, processed_count: int) -> float:
+    def estimate_processing_seconds_for_video(self, video_seconds: Optional[float]) -> Optional[float]:
+        if video_seconds is None:
+            if not self.samples:
+                return None
+            return float(np.mean([s["processing_seconds"] for s in self.samples]))
         intercept, slope = self.fit()
+        minutes = max(0.0, float(video_seconds) / 60.0)
+        return max(0.0, (intercept + slope * minutes) * 60.0)
+
+    def estimate_remaining_seconds(self, processed_count: int) -> float:
         remaining = 0.0
         for duration in self.planned_durations_seconds[processed_count:]:
-            if duration is None:
+            estimate = self.estimate_processing_seconds_for_video(duration)
+            if estimate is None:
                 continue
-            minutes = max(0.0, float(duration) / 60.0)
-            remaining += max(0.0, (intercept + slope * minutes) * 60.0)
+            remaining += estimate
         return remaining
 
     def progress_percent(self, processed_count: int) -> float:
@@ -63,14 +81,23 @@ class RuntimeEstimator:
             return 0.0
         return min(100.0, 100.0 * processed_count / self.total_videos)
 
+    def snapshot(self, processed_count: int, elapsed_seconds: float) -> RuntimeSnapshot:
+        return RuntimeSnapshot(
+            processed_count=int(processed_count),
+            total_videos=int(self.total_videos),
+            percent=self.progress_percent(processed_count),
+            elapsed_seconds=max(0.0, float(elapsed_seconds)),
+            eta_seconds=self.estimate_remaining_seconds(processed_count),
+            formula=self.formula_text(),
+        )
+
     def render_progress_line(self, processed_count: int, elapsed_seconds: float) -> str:
-        pct = self.progress_percent(processed_count)
-        filled = int(round(pct / 4.0))
+        snapshot = self.snapshot(processed_count, elapsed_seconds)
+        filled = int(round(snapshot.percent / 4.0))
         bar = "█" * filled + "░" * (25 - filled)
-        eta = self.estimate_remaining_seconds(processed_count)
         return (
-            f"[{bar}] {pct:5.1f}% | Videos: {processed_count}/{self.total_videos} | "
-            f"Elapsed: {_fmt_hms(elapsed_seconds)} | ETA: {_fmt_hms(eta)}"
+            f"[{bar}] {snapshot.percent:5.1f}% | Videos: {snapshot.processed_count}/{snapshot.total_videos} | "
+            f"Elapsed: {_fmt_hms(snapshot.elapsed_seconds)} | ETA: {_fmt_hms(snapshot.eta_seconds)}"
         )
 
     def formula_text(self) -> str:

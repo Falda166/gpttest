@@ -16,6 +16,7 @@ A small Python project that downloads YouTube audio, transcribes German speech w
 - Applies 2-step CSV cleanup (rule-based + semantic merge with multilingual MPNet)
 - Outputs cleaned word counts to `output/word_frequency.csv`
 - Colorized step-by-step logs with duration tracking
+- Large live footer progress bar for interactive PowerShell/WSL terminals
 - Runtime tweaks for cleaner logs (optional warning filters + TF32 enable)
 
 ## Project Structure
@@ -30,6 +31,7 @@ A small Python project that downloads YouTube audio, transcribes German speech w
 │   ├── text_processing.py
 │   ├── helpers.py
 │   ├── logging_utils.py
+│   ├── terminal_ui.py
 │   ├── csv_cleanup.py
 │   ├── runtime.py
 │   └── pipeline.py
@@ -119,6 +121,8 @@ python app.py
 Output will be written to:
 
 - `output/word_frequency.csv`
+
+Interactive terminals also show a large live footer with progress, elapsed time, ETA, current stage, and the latest status message. If the terminal is too narrow or not interactive, the app falls back to normal inline logs automatically.
 
 ## Notes on `voice_db.json`
 
