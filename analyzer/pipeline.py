@@ -28,7 +28,6 @@ def process_single_video(
     embedder,
     device_torch,
     device_str,
-    return_metadata: bool = False,
 ):
     video_start = time.time()
     log_info(f"Verarbeite: {url}")
@@ -51,18 +50,10 @@ def process_single_video(
         f"(entfernt: {cleaning_stats['removed_seconds']:.1f}s, Bereiche: {cleaning_stats['regions']})"
     )
 
-    audio_for_processing = cleaned_audio_file
-    if cleaning_stats["cleaned_seconds"] < config.MIN_CLEANED_AUDIO_SECONDS:
-        log_warn(
-            f"Bereinigte Datei ist sehr kurz ({cleaning_stats['cleaned_seconds']:.1f}s). "
-            "Nutze stattdessen Roh-Audio für stabilere Diarization."
-        )
-        audio_for_processing = raw_audio_file
-
     audio_for_whisperx = timed_step(
         "Audio für WhisperX laden",
         whisperx.load_audio,
-        str(audio_for_processing),
+        str(cleaned_audio_file),
     )
 
     asr_result = timed_step(
@@ -83,7 +74,7 @@ def process_single_video(
         device_str,
     )
 
-    waveform, sr = timed_step("Audio-Tensor laden", load_audio_tensor, audio_for_processing)
+    waveform, sr = timed_step("Audio-Tensor laden", load_audio_tensor, cleaned_audio_file)
 
     audio_dict = {"waveform": waveform.to(device_torch), "sample_rate": sr}
 
@@ -126,11 +117,11 @@ def process_single_video(
 
     if best_speaker is None:
         log_warn("Kein passender Speaker gefunden, Video wird übersprungen.")
-        return {"words": [], "transcript": "", "timed_words": [], "speaker_word_counts": {}} if return_metadata else []
+        return []
 
     if best_score < config.MIN_ACCEPT_SCORE:
         log_warn(f"Score zu niedrig ({best_score:.3f}) -> Video übersprungen")
-        return {"words": [], "transcript": "", "timed_words": [], "speaker_word_counts": {}} if return_metadata else []
+        return []
 
     label = classify_score(best_score, config.MATCH_THRESHOLD_STRONG, config.MATCH_THRESHOLD_MAYBE)
     log_ok(f"Match: {best_speaker} ({best_score:.3f}, {label})")
@@ -163,28 +154,7 @@ def process_single_video(
     dt = time.time() - t0
     log_ok(f"Wörter gefiltert in {fmt_seconds(dt)} | akzeptiert: {len(accepted_words)}")
 
-    transcript_words = []
-    speaker_word_counts = {}
-    for seg in result_with_speakers["segments"]:
-        seg_speaker = seg.get("speaker", "unknown")
-        for word in seg.get("words", []):
-            txt = normalize_word_for_counting(clean_word(word.get("word", "")))
-            if not txt:
-                continue
-            transcript_words.append({"start": float(word.get("start", 0.0)), "word": txt, "speaker": seg_speaker})
-            speaker_word_counts.setdefault(seg_speaker, {})
-            speaker_word_counts[seg_speaker][txt] = speaker_word_counts[seg_speaker].get(txt, 0) + 1
-
     total_video_time = time.time() - video_start
     log_ok(f"Video komplett fertig in {fmt_seconds(total_video_time)}")
-
-    if return_metadata:
-        transcript_text = " ".join([w["word"] for w in transcript_words])
-        return {
-            "words": accepted_words,
-            "transcript": transcript_text,
-            "timed_words": transcript_words,
-            "speaker_word_counts": speaker_word_counts,
-        }
 
     return accepted_words

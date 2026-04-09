@@ -4,27 +4,14 @@ from pathlib import Path
 INPUT_LINKS_FILE = Path("./youtube_links.txt")
 
 OUTPUT_DIR = Path("./output")
-PLOTS_DIR = OUTPUT_DIR / "plots"
-CSV_DIR = OUTPUT_DIR / "csv"
 AUDIO_DIR = OUTPUT_DIR / "audios"
 CLEAN_AUDIO_DIR = OUTPUT_DIR / "cleaned_audios"
-CACHE_DIR = Path("./cache")
-
-for d in [OUTPUT_DIR, PLOTS_DIR, CSV_DIR, AUDIO_DIR, CLEAN_AUDIO_DIR, CACHE_DIR]:
-    d.mkdir(parents=True, exist_ok=True)
+OUTPUT_DIR.mkdir(exist_ok=True)
+AUDIO_DIR.mkdir(exist_ok=True)
+CLEAN_AUDIO_DIR.mkdir(exist_ok=True)
 
 DB_FILE = "voice_db.json"
 FINAL_CSV_FILE = OUTPUT_DIR / "word_frequency.csv"
-
-TOPICS_CSV_FILE = CSV_DIR / "video_topics.csv"
-VIDEO_SIMILARITY_CSV_FILE = CSV_DIR / "video_similarity.csv"
-SPEAKER_STYLE_CSV_FILE = CSV_DIR / "speaker_style.csv"
-WORD_CLUSTERS_HTML = OUTPUT_DIR / "word_clusters.html"
-WORD_CLUSTERS_PLOT_HTML = PLOTS_DIR / "word_clusters.html"
-WORD_TIMELINE_HTML = OUTPUT_DIR / "word_timeline.html"
-WORD_TIMELINE_PLOT_HTML = PLOTS_DIR / "word_timeline.html"
-
-EMBEDDINGS_CACHE_FILE = CACHE_DIR / "embeddings.pkl"
 
 HF_TOKEN = os.getenv("HF_TOKEN")
 if not HF_TOKEN:
@@ -46,11 +33,5 @@ MIN_SILENCE_SECONDS = 0.25
 KEEP_SILENCE_SECONDS = 0.08
 MIN_CHUNK_SECONDS = 0.20
 
-# NLP-Erweiterung
 CSV_CLEANUP_MODEL = "sentence-transformers/paraphrase-multilingual-mpnet-base-v2"
 CSV_SEMANTIC_THRESHOLD = 0.87
-WORD_CLUSTER_MIN_SIZE = 2
-
-QUIET_THIRD_PARTY_WARNINGS = True
-ENABLE_TF32 = True
-MIN_CLEANED_AUDIO_SECONDS = 20.0

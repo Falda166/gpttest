@@ -31,7 +31,6 @@ A small Python project that downloads YouTube audio, transcribes German speech w
 │   ├── helpers.py
 │   ├── logging_utils.py
 │   ├── csv_cleanup.py
-│   ├── runtime.py
 │   └── pipeline.py
 ├── extract_channel_links.py
 ├── requirements.txt

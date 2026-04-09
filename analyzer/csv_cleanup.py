@@ -1,19 +1,23 @@
+from collections import defaultdict
+
 import numpy as np
 import pandas as pd
-
-from analyzer.embedding_cache import EmbeddingCache
+from sentence_transformers import SentenceTransformer
 
 
 class CsvCleaner:
-    def __init__(self, model_name: str, semantic_threshold: float = 0.87, embedding_cache: EmbeddingCache | None = None):
+    def __init__(self, model_name: str, semantic_threshold: float = 0.87):
         self.model_name = model_name
         self.semantic_threshold = semantic_threshold
-        self.embedding_cache = embedding_cache or EmbeddingCache(
-            model_name=model_name,
-            cache_path=None,  # type: ignore[arg-type]
-        )
+        self._model = None
+
+    def _get_model(self):
+        if self._model is None:
+            self._model = SentenceTransformer(self.model_name)
+        return self._model
 
     def basic_cleanup(self, df: pd.DataFrame) -> pd.DataFrame:
+        """Erste Bereinigung: ungültige Tokens entfernen und doppelte Leerzeichen normalisieren."""
         if df.empty:
             return df
 
@@ -30,13 +34,15 @@ class CsvCleaner:
         return cleaned
 
     def semantic_cleanup(self, df: pd.DataFrame) -> pd.DataFrame:
+        """Zweite Bereinigung: semantisch sehr ähnliche Wörter/Varianten zusammenführen."""
         if df.empty or len(df) <= 1:
             return df
 
+        model = self._get_model()
         words = df["word"].tolist()
         counts = df["count"].to_numpy()
 
-        embeddings = self.embedding_cache.encode(words)
+        embeddings = model.encode(words, normalize_embeddings=True, show_progress_bar=False)
         embeddings = np.asarray(embeddings, dtype=np.float32)
 
         parent = list(range(len(words)))
@@ -58,14 +64,13 @@ class CsvCleaner:
                 if sim[i, j] >= self.semantic_threshold:
                     union(i, j)
 
-        merged_rows = []
-        groups = {}
+        groups = defaultdict(list)
         for idx in range(len(words)):
-            root = find(idx)
-            groups.setdefault(root, []).append(idx)
+            groups[find(idx)].append(idx)
 
+        merged_rows = []
         for indices in groups.values():
-            canonical_idx = max(indices, key=lambda x: (counts[x], -len(words[x])))
+            canonical_idx = max(indices, key=lambda x: counts[x])
             canonical_word = words[canonical_idx]
             merged_count = int(sum(counts[i] for i in indices))
             merged_rows.append({"word": canonical_word, "count": merged_count})

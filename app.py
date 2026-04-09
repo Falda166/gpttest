@@ -3,10 +3,8 @@ import os
 import time
 from collections import Counter
 
-os.environ.setdefault("ORT_LOG_SEVERITY_LEVEL", "3")
-os.environ.setdefault("TOKENIZERS_PARALLELISM", "false")
-
 import pandas as pd
+import torch
 import whisperx
 from dotenv import load_dotenv
 from pyannote.audio import Pipeline
@@ -14,18 +12,10 @@ from pyannote.audio.pipelines.speaker_verification import SpeakerEmbedding
 
 from analyzer import config
 from analyzer.audio_processing import cleanup_audio_files
-from analyzer.csv_cleanup import CsvCleaner
-from analyzer.embedding_cache import EmbeddingCache
 from analyzer.helpers import read_links_from_txt, extract_embedding
 from analyzer.logging_utils import timed_step, log_info, log_ok, log_error, fmt_seconds, log_step
 from analyzer.pipeline import process_single_video
-from analyzer.runtime import configure_runtime, resolve_device
-from analyzer.speaker_style import compare_speakers
-from analyzer.time_analysis import word_frequency_over_time
-from analyzer.topic_detection import extract_topics
-from analyzer.video_similarity import compute_video_similarity
-from analyzer.visualization import visualize_word_embeddings
-from analyzer.word_clustering import normalize_words
+from analyzer.csv_cleanup import CsvCleaner
 
 load_dotenv()
 
@@ -33,8 +23,9 @@ load_dotenv()
 def main():
     total_start = time.time()
 
-    configure_runtime(config.QUIET_THIRD_PARTY_WARNINGS, config.ENABLE_TF32)
-    device_torch, device_str, compute_type = resolve_device()
+    device_torch = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    device_str = "cuda" if torch.cuda.is_available() else "cpu"
+    compute_type = "float16" if torch.cuda.is_available() else "int8"
 
     log_info("Starte Verarbeitung")
     log_info(f"Device: {device_str} | compute_type: {compute_type}")
@@ -88,19 +79,11 @@ def main():
         embedder.to(device_torch)
         log_ok("SpeakerEmbedding auf Device verschoben")
 
-    embedding_cache = timed_step(
-        "Embedding Cache initialisieren",
-        EmbeddingCache,
-        config.CSV_CLEANUP_MODEL,
-        config.EMBEDDINGS_CACHE_FILE,
-    )
-
     csv_cleaner = timed_step(
         "CSV-Cleaner Modell laden",
         CsvCleaner,
         config.CSV_CLEANUP_MODEL,
         config.CSV_SEMANTIC_THRESHOLD,
-        embedding_cache,
     )
 
     total_counter = Counter()
@@ -108,7 +91,7 @@ def main():
 
     video_texts = {}
     timeline_words = []
-    global_speaker_counts = {}
+    global_speaker_counts = defaultdict(Counter)
 
     for idx, url in enumerate(links, start=1):
         loop_start = time.time()
@@ -131,7 +114,6 @@ def main():
                 embedder=embedder,
                 device_torch=device_torch,
                 device_str=device_str,
-                return_metadata=True,
             )
 
             words = result["words"]
@@ -140,8 +122,6 @@ def main():
             timeline_words.extend(result["timed_words"])
 
             for speaker, counts in result["speaker_word_counts"].items():
-                if speaker not in global_speaker_counts:
-                    global_speaker_counts[speaker] = Counter()
                 global_speaker_counts[speaker].update(counts)
 
             log_ok(f"Aktueller Wortschatz: {len(total_counter)} unique Wörter")
@@ -164,34 +144,12 @@ def main():
     if not df.empty:
         df = timed_step("CSV Basis-Bereinigung", csv_cleaner.basic_cleanup, df)
         df = timed_step("CSV Semantik-Bereinigung", csv_cleaner.semantic_cleanup, df)
-
-        normalized_words = timed_step(
-            "Wort-Clustering + Normalisierung",
-            normalize_words,
-            list(df["word"]),
-            embedding_cache,
-            config.WORD_CLUSTER_MIN_SIZE,
-        )
-        df["word"] = normalized_words
-        df = df.groupby("word", as_index=False)["count"].sum()
-
-        embeddings = timed_step("Embeddings für Visualisierung", embedding_cache.encode, list(df["word"]))
-        timed_step("Word Cluster Plot speichern", visualize_word_embeddings, list(df["word"]), embeddings, config.WORD_CLUSTERS_HTML)
-        timed_step("Word Cluster Plot (plots/) speichern", visualize_word_embeddings, list(df["word"]), embeddings, config.WORD_CLUSTERS_PLOT_HTML)
-
         df = df.sort_values(by=["count", "word"], ascending=[False, True]).reset_index(drop=True)
 
     df.to_csv(config.FINAL_CSV_FILE, index=False, encoding="utf-8")
-    df.to_csv(config.CSV_DIR / "word_frequency.csv", index=False, encoding="utf-8")
-
-    timed_step("Topics extrahieren", extract_topics, video_texts, config.CSV_CLEANUP_MODEL, config.TOPICS_CSV_FILE)
-    timed_step("Video Similarity berechnen", compute_video_similarity, video_texts, embedding_cache, config.VIDEO_SIMILARITY_CSV_FILE)
-    timed_step("Speaker Style exportieren", compare_speakers, {k: dict(v) for k, v in global_speaker_counts.items()}, config.SPEAKER_STYLE_CSV_FILE)
-    timed_step("Word Timeline speichern", word_frequency_over_time, timeline_words, config.WORD_TIMELINE_HTML)
-    timed_step("Word Timeline (plots/) speichern", word_frequency_over_time, timeline_words, config.WORD_TIMELINE_PLOT_HTML)
 
     dt = time.time() - t0
-    log_ok(f"CSV/NLP-Ausgaben geschrieben in {fmt_seconds(dt)}")
+    log_ok(f"CSV geschrieben in {fmt_seconds(dt)} -> {config.FINAL_CSV_FILE}")
 
     total_dt = time.time() - total_start
     print()

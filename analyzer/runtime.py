@@ -24,21 +24,6 @@ def configure_runtime(quiet_warnings: bool = True, enable_tf32: bool = True):
             message=r"Found keys that are not in the model state dict.*",
             category=UserWarning,
         )
-        warnings.filterwarnings(
-            "ignore",
-            message=r"Lightning automatically upgraded your loaded checkpoint.*",
-            category=UserWarning,
-        )
-        warnings.filterwarnings(
-            "ignore",
-            message=r"You have multiple `ModelCheckpoint` callback states.*",
-            category=UserWarning,
-        )
-        warnings.filterwarnings(
-            "ignore",
-            message=r"Redirecting import of pytorch_lightning.callbacks.*",
-            category=UserWarning,
-        )
 
 
 def resolve_device():
