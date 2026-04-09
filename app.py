@@ -17,7 +17,7 @@ from analyzer.audio_processing import cleanup_audio_files
 from analyzer.csv_cleanup import CsvCleaner
 from analyzer.embedding_cache import EmbeddingCache
 from analyzer.helpers import read_links_from_txt, extract_embedding
-from analyzer.logging_utils import timed_step, log_info, log_ok, log_error, fmt_seconds, log_step
+from analyzer.logging_utils import timed_step, log_info, log_ok, log_error, log_warn, fmt_seconds, log_step
 from analyzer.pipeline import process_single_video
 from analyzer.runtime import configure_runtime, resolve_device
 from analyzer.speaker_style import compare_speakers
@@ -28,6 +28,14 @@ from analyzer.visualization import visualize_word_embeddings
 from analyzer.word_clustering import normalize_words
 
 load_dotenv()
+
+
+def run_optional_step(label: str, func, *args, **kwargs):
+    try:
+        return timed_step(label, func, *args, **kwargs)
+    except Exception as e:
+        log_warn(f"{label} übersprungen: {e}")
+        return None
 
 
 def main():
@@ -175,20 +183,21 @@ def main():
         df["word"] = normalized_words
         df = df.groupby("word", as_index=False)["count"].sum()
 
-        embeddings = timed_step("Embeddings für Visualisierung", embedding_cache.encode, list(df["word"]))
-        timed_step("Word Cluster Plot speichern", visualize_word_embeddings, list(df["word"]), embeddings, config.WORD_CLUSTERS_HTML)
-        timed_step("Word Cluster Plot (plots/) speichern", visualize_word_embeddings, list(df["word"]), embeddings, config.WORD_CLUSTERS_PLOT_HTML)
+        embeddings = run_optional_step("Embeddings für Visualisierung", embedding_cache.encode, list(df["word"]))
+        if embeddings is not None:
+            run_optional_step("Word Cluster Plot speichern", visualize_word_embeddings, list(df["word"]), embeddings, config.WORD_CLUSTERS_HTML)
+            run_optional_step("Word Cluster Plot (plots/) speichern", visualize_word_embeddings, list(df["word"]), embeddings, config.WORD_CLUSTERS_PLOT_HTML)
 
         df = df.sort_values(by=["count", "word"], ascending=[False, True]).reset_index(drop=True)
 
     df.to_csv(config.FINAL_CSV_FILE, index=False, encoding="utf-8")
     df.to_csv(config.CSV_DIR / "word_frequency.csv", index=False, encoding="utf-8")
 
-    timed_step("Topics extrahieren", extract_topics, video_texts, config.CSV_CLEANUP_MODEL, config.TOPICS_CSV_FILE)
-    timed_step("Video Similarity berechnen", compute_video_similarity, video_texts, embedding_cache, config.VIDEO_SIMILARITY_CSV_FILE)
-    timed_step("Speaker Style exportieren", compare_speakers, {k: dict(v) for k, v in global_speaker_counts.items()}, config.SPEAKER_STYLE_CSV_FILE)
-    timed_step("Word Timeline speichern", word_frequency_over_time, timeline_words, config.WORD_TIMELINE_HTML)
-    timed_step("Word Timeline (plots/) speichern", word_frequency_over_time, timeline_words, config.WORD_TIMELINE_PLOT_HTML)
+    run_optional_step("Topics extrahieren", extract_topics, video_texts, config.CSV_CLEANUP_MODEL, config.TOPICS_CSV_FILE)
+    run_optional_step("Video Similarity berechnen", compute_video_similarity, video_texts, embedding_cache, config.VIDEO_SIMILARITY_CSV_FILE)
+    run_optional_step("Speaker Style exportieren", compare_speakers, {k: dict(v) for k, v in global_speaker_counts.items()}, config.SPEAKER_STYLE_CSV_FILE)
+    run_optional_step("Word Timeline speichern", word_frequency_over_time, timeline_words, config.WORD_TIMELINE_HTML)
+    run_optional_step("Word Timeline (plots/) speichern", word_frequency_over_time, timeline_words, config.WORD_TIMELINE_PLOT_HTML)
 
     dt = time.time() - t0
     log_ok(f"CSV/NLP-Ausgaben geschrieben in {fmt_seconds(dt)}")
