@@ -1,3 +1,5 @@
+import shutil
+import sys
 import time
 from colorama import init, Fore, Style
 
@@ -39,3 +41,18 @@ def timed_step(label: str, func, *args, **kwargs):
     dt = time.time() - t0
     log_ok(f"{label} fertig in {fmt_seconds(dt)}")
     return result
+
+
+def draw_bottom_panel(lines: list[str]):
+    if not lines:
+        return
+    rows, cols = shutil.get_terminal_size((24, 100))
+    visible_lines = lines[-max(1, rows):]
+    start_row = max(1, rows - len(visible_lines) + 1)
+
+    sys.stdout.write("\033[s")
+    for offset, line in enumerate(visible_lines):
+        row = start_row + offset
+        sys.stdout.write(f"\033[{row};1H\033[2K{line[:cols]}")
+    sys.stdout.write("\033[u")
+    sys.stdout.flush()
