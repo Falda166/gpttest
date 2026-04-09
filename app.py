@@ -125,6 +125,7 @@ def main():
 
         raw_audio_file = config.AUDIO_DIR / f"audio_{idx}.wav"
         cleaned_audio_file = config.CLEAN_AUDIO_DIR / f"audio_{idx}_cleaned.wav"
+        target_audio_file = config.CLEAN_AUDIO_DIR / f"audio_{idx}_cleaned_target.wav"
 
         try:
             result = process_single_video(
@@ -158,7 +159,7 @@ def main():
             log_error(f"Fehler bei Link {idx}: {e}")
 
         finally:
-            cleanup_audio_files(raw_audio_file, cleaned_audio_file)
+            cleanup_audio_files(raw_audio_file, cleaned_audio_file, target_audio_file)
             log_ok("Temporäre Audio-Dateien gelöscht")
 
         loop_dt = time.time() - loop_start
