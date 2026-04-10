@@ -1,6 +1,14 @@
 import os
 from pathlib import Path
 
+
+def env_flag(name: str, default: bool) -> bool:
+    value = os.getenv(name)
+    if value is None:
+        return default
+    return value.strip().lower() in {"1", "true", "yes", "on"}
+
+
 INPUT_LINKS_FILE = Path("./youtube_links.txt")
 
 OUTPUT_DIR = Path("./output")
@@ -8,9 +16,11 @@ PLOTS_DIR = OUTPUT_DIR / "plots"
 CSV_DIR = OUTPUT_DIR / "csv"
 AUDIO_DIR = OUTPUT_DIR / "audios"
 CLEAN_AUDIO_DIR = OUTPUT_DIR / "cleaned_audios"
+TRAINING_DIR = OUTPUT_DIR / "training"
+PAPAPLATTE_TRAINING_DIR = TRAINING_DIR / "papaplatte"
 CACHE_DIR = Path("./cache")
 
-for d in [OUTPUT_DIR, PLOTS_DIR, CSV_DIR, AUDIO_DIR, CLEAN_AUDIO_DIR, CACHE_DIR]:
+for d in [OUTPUT_DIR, PLOTS_DIR, CSV_DIR, AUDIO_DIR, CLEAN_AUDIO_DIR, TRAINING_DIR, PAPAPLATTE_TRAINING_DIR, CACHE_DIR]:
     d.mkdir(parents=True, exist_ok=True)
 
 DB_FILE = "voice_db.json"
@@ -34,6 +44,7 @@ if not HF_TOKEN:
 
 WHISPERX_MODEL = "medium"
 WHISPER_LANGUAGE = "de"
+DIARIZATION_MODEL = os.getenv("DIARIZATION_MODEL", "pyannote/speaker-diarization-community-1")
 
 MATCH_THRESHOLD_STRONG = 0.55
 MATCH_THRESHOLD_MAYBE = 0.40
@@ -41,6 +52,7 @@ MIN_ACCEPT_SCORE = 0.40
 
 MIN_SEGMENT_SECONDS = 1.5
 AUDIO_OVERWRITE = True
+SAVE_PAPAPLATTE_TRAINING_AUDIO = env_flag("SAVE_PAPAPLATTE_TRAINING_AUDIO", True)
 
 # Audio-Bereinigung
 SILENCE_THRESHOLD = 0.008  # RMS-Schwelle

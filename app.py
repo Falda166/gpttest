@@ -48,6 +48,11 @@ def main():
 
     log_info("Starte Verarbeitung")
     log_info(f"Device: {device_str} | compute_type: {compute_type}")
+    log_info(
+        "Training-Audio-Export: "
+        f"{'aktiv' if config.SAVE_PAPAPLATTE_TRAINING_AUDIO else 'inaktiv'} "
+        f"({config.PAPAPLATTE_TRAINING_DIR})"
+    )
 
     links = timed_step("Links aus TXT laden", read_links_from_txt, config.INPUT_LINKS_FILE)
     log_info(f"{len(links)} Links geladen")
@@ -98,7 +103,7 @@ def main():
     diar = timed_step(
         "pyannote Diarization Pipeline laden",
         Pipeline.from_pretrained,
-        "pyannote/speaker-diarization-community-1",
+        config.DIARIZATION_MODEL,
         token=config.HF_TOKEN,
     )
     diar.to(device_torch)

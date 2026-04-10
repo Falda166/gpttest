@@ -18,6 +18,10 @@ env/
 .DS_Store
 
 # Runtime output
-output/
+output/*
+!output/training/
+output/training/*
+!output/training/papaplatte/
+!output/training/papaplatte/*.wav
 voice_db.json
 youtube_links.txt
