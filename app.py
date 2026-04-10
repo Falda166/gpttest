@@ -1,5 +1,6 @@
 import json
 import os
+import random
 import time
 from collections import Counter
 
@@ -17,7 +18,7 @@ from analyzer.audio_processing import cleanup_audio_files, fetch_video_duration_
 from analyzer.app_flow import load_channel_items, process_video_batch, filter_new_items
 from analyzer.csv_cleanup import CsvCleaner
 from analyzer.embedding_cache import EmbeddingCache
-from analyzer.helpers import extract_embedding
+from analyzer.helpers import cosine_similarity, extract_embedding
 from analyzer.logging_utils import (
     configure_console,
     finish_console,
@@ -71,10 +72,11 @@ def save_analyzed_urls(path, urls: set[str]):
 
 
 def auto_profile_target_embedding(profile_items, diar, embedder, device_torch):
-    from analyzer.audio_processing import download_audio, load_audio_tensor
+    from analyzer.audio_processing import download_audio, extract_time_regions_to_audio, load_audio_tensor
     import numpy as np
 
-    speaker_embs_all = []
+    candidates = []
+    profile_sessions = []
 
     for i, item in enumerate(profile_items, start=1):
         url = item["url"]
@@ -87,8 +89,7 @@ def auto_profile_target_embedding(profile_items, diar, embedder, device_torch):
         durations = {}
         for segment, _, speaker in annotation.itertracks(yield_label=True):
             durations[speaker] = durations.get(speaker, 0.0) + max(0.0, float(segment.end) - float(segment.start))
-        dominant_speaker = max(durations, key=durations.get) if durations else None
-        if dominant_speaker is None:
+        if not durations:
             cleanup_audio_files(raw_audio_file)
             continue
 
@@ -101,13 +102,66 @@ def auto_profile_target_embedding(profile_items, diar, embedder, device_torch):
             min_seconds=config.MIN_SEGMENT_SECONDS,
             device=device_torch,
         )
-        speaker_embs_all.extend(all_embs.get(dominant_speaker, []))
-        cleanup_audio_files(raw_audio_file)
+        speaker_regions = {}
+        for segment, _, speaker in annotation.itertracks(yield_label=True):
+            speaker_regions.setdefault(speaker, []).append((float(segment.start), float(segment.end)))
 
-    if not speaker_embs_all:
+        for speaker, embs in all_embs.items():
+            if not embs:
+                continue
+            mean_emb = normalize_embedding(np.mean(np.stack(embs, axis=0), axis=0))
+            candidates.append(
+                {
+                    "video_idx": i,
+                    "url": url,
+                    "speaker": speaker,
+                    "duration": durations.get(speaker, 0.0),
+                    "embedding": mean_emb,
+                    "regions": speaker_regions.get(speaker, []),
+                    "raw_audio_file": raw_audio_file,
+                }
+            )
+
+        profile_sessions.append({"raw_audio_file": raw_audio_file})
+
+    if not candidates:
         raise RuntimeError("Konnte aus Profiling-Videos kein gültiges Referenz-Embedding erzeugen.")
 
-    return normalize_embedding(np.mean(np.stack(speaker_embs_all, axis=0), axis=0))
+    for c in candidates:
+        sims = []
+        for other in candidates:
+            if other is c or other["video_idx"] == c["video_idx"]:
+                continue
+            sims.append(cosine_similarity(c["embedding"], other["embedding"]))
+        c["avg_similarity"] = float(np.mean(sims)) if sims else -1.0
+
+    best_candidate = max(candidates, key=lambda x: (x["avg_similarity"], x["duration"]))
+    ref_emb = best_candidate["embedding"]
+
+    matched = [c for c in candidates if cosine_similarity(c["embedding"], ref_emb) >= config.PROFILE_MATCH_MIN_SCORE]
+    if not matched:
+        matched = [best_candidate]
+
+    profile_emb = normalize_embedding(np.mean(np.stack([c["embedding"] for c in matched], axis=0), axis=0))
+    training_source = max(matched, key=lambda x: cosine_similarity(x["embedding"], profile_emb))
+    training_audio_file = config.TARGET_TRAINING_DIR / "training.wav"
+    timed_step(
+        "Profiling-Training-Audio schneiden",
+        extract_time_regions_to_audio,
+        training_source["raw_audio_file"],
+        training_audio_file,
+        training_source["regions"],
+        config.MIN_SEGMENT_SECONDS,
+    )
+    log_ok(
+        f"Profiling abgeschlossen: {training_source['speaker']} aus Video {training_source['video_idx']} "
+        f"(avg_similarity={training_source['avg_similarity']:.3f}) -> {training_audio_file}"
+    )
+
+    for session in profile_sessions:
+        cleanup_audio_files(session["raw_audio_file"])
+
+    return profile_emb
 
 
 def main():
@@ -173,8 +227,15 @@ def main():
         runtime_estimator = RuntimeEstimator(total_videos=total_links, planned_durations_seconds=durations)
         console.set_progress(runtime_estimator.snapshot(0, time.time() - total_start))
 
-        with open(config.DB_FILE, "r", encoding="utf-8") as f:
-            db = json.load(f)
+        if config.RESET_VOICE_DB_ON_START:
+            db = {}
+            log_warn("voice_db wird für diese Session neu aufgebaut (RESET_VOICE_DB_ON_START=true).")
+        else:
+            try:
+                with open(config.DB_FILE, "r", encoding="utf-8") as f:
+                    db = json.load(f)
+            except Exception:
+                db = {}
 
         diarization_token = config.HF_TOKEN
         if config.DIARIZATION_MODEL.startswith("pyannote/speaker-diarization-precision"):
@@ -193,19 +254,20 @@ def main():
             embedder.to(device_torch)
 
         target_key = config.TARGET_SPEAKER_KEY
-        if target_key not in db and "papaplatte" in db:
-            db[target_key] = db["papaplatte"]
-            log_warn(f"Migriere legacy voice_db Eintrag 'papaplatte' -> '{target_key}'.")
+        for old_training_wav in config.TARGET_TRAINING_DIR.glob("*.wav"):
+            try:
+                old_training_wav.unlink()
+            except Exception as e:
+                log_warn(f"Konnte altes Training-Audio nicht löschen ({old_training_wav}): {e}")
 
-        if target_key not in db:
-            profile_items = items[:max(2, config.SPEAKER_PROFILE_VIDEOS)]
-            target_emb = timed_step("Auto-Profiling Hauptsprecher", auto_profile_target_embedding, profile_items, diar, embedder, device_torch)
-            db[target_key] = {"embedding": target_emb.tolist(), "source": "auto-profile"}
-            with open(config.DB_FILE, "w", encoding="utf-8") as f:
-                json.dump(db, f, ensure_ascii=False, indent=2)
-            log_ok(f"{target_key} automatisch in voice_db.json gespeichert.")
-        else:
-            target_emb = timed_step("Referenz-Embedding laden", extract_embedding, db[target_key], target_key)
+        sample_size = min(len(items), max(2, config.SPEAKER_PROFILE_VIDEOS))
+        profile_items = random.sample(items, k=sample_size)
+        target_emb = timed_step("Auto-Profiling Hauptsprecher", auto_profile_target_embedding, profile_items, diar, embedder, device_torch)
+        db[target_key] = {"embedding": target_emb.tolist(), "source": "auto-profile-random-videos", "profile_video_count": sample_size}
+        with open(config.DB_FILE, "w", encoding="utf-8") as f:
+            json.dump(db, f, ensure_ascii=False, indent=2)
+        target_emb = timed_step("Referenz-Embedding laden", extract_embedding, db[target_key], target_key)
+        log_ok(f"{target_key} für diese Session neu erstellt und in voice_db.json gespeichert.")
 
         whisperx_model = timed_step("WhisperX Modell laden", whisperx.load_model, config.WHISPERX_MODEL, device_str, compute_type=compute_type, language=config.WHISPER_LANGUAGE)
         align_model, align_metadata = timed_step("Alignment-Modell laden", whisperx.load_align_model, language_code=config.WHISPER_LANGUAGE, device=device_str)
