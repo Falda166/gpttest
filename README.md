@@ -13,6 +13,9 @@ A small Python project that downloads YouTube audio, transcribes German speech w
 - Performs diarization and overlap filtering
 - Matches a known reference voice embedding (e.g. `papaplatte`) against detected speakers
 - Speichert automatisch `papaplatte`-Only Trainings-WAVs in `output/training/papaplatte/`
+- Fragt beim Start nach einem Channel-Link, falls keiner in `.env` gesetzt ist
+- Erstellt bei leerer `voice_db.json` automatisch ein Papaplatte-Profil aus 2 Videos
+- Führt eine Blacklist (`output/csv/analyzed_videos.json`) für bereits analysierte Videos
 - Applies 2-step CSV cleanup (rule-based + semantic merge with multilingual MPNet)
 - Outputs cleaned word counts to `output/word_frequency.csv`
 - Colorized step-by-step logs with duration tracking
@@ -95,14 +98,16 @@ DIARIZATION_MODEL=pyannote/speaker-diarization-community-1
 ```env
 YOUTUBE_CHANNEL_URL=https://www.youtube.com/@channel_handle/videos
 YOUTUBE_MAX_LINKS=100
-YOUTUBE_FETCH_ALL=false
+YOUTUBE_FETCH_ALL=true
 YOUTUBE_PROXY=
 YOUTUBE_NO_PROXY=false
+SPEAKER_PROFILE_VIDEOS=2
 ```
 
 Hinweis:
 - `YOUTUBE_FETCH_ALL=true` ignoriert `YOUTUBE_MAX_LINKS`.
 - Wenn ein Proxy Probleme macht: `YOUTUBE_NO_PROXY=true`.
+- Bereits analysierte Videos werden in `output/csv/analyzed_videos.json` gespeichert und bei Neustart übersprungen.
 
 ### 4) Run
 
@@ -115,6 +120,7 @@ Output will be written to:
 - `output/word_frequency.csv`
 - `output/training/papaplatte/*.wav` (nur Target-Speaker-Audio)
 - Bei `Strg+C` werden bereits berechnete Teilergebnisse trotzdem als CSV/NLP-Outputs geschrieben.
+- In den Logs werden pro Video zusätzlich Titel + Metadaten ausgegeben.
 
 ## Notes on `voice_db.json`
 

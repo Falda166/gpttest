@@ -65,7 +65,7 @@ def normalize_embedding(emb):
     return emb / norm
 
 
-def collect_speaker_embeddings(annotation, waveform, sr, embedder, ref_shape, min_seconds=1.5, device=None):
+def collect_speaker_embeddings(annotation, waveform, sr, embedder, ref_shape=None, min_seconds=1.5, device=None):
     speaker_embs = {}
 
     tracks = list(annotation.itertracks(yield_label=True))
@@ -85,7 +85,7 @@ def collect_speaker_embeddings(annotation, waveform, sr, embedder, ref_shape, mi
         except Exception:
             continue
 
-        if emb.shape != ref_shape:
+        if ref_shape is not None and emb.shape != ref_shape:
             continue
 
         speaker_embs.setdefault(speaker, []).append(emb)

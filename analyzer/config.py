@@ -4,7 +4,7 @@ from pathlib import Path
 INPUT_LINKS_FILE = Path("./youtube_links.txt")
 YOUTUBE_CHANNEL_URL = os.getenv("YOUTUBE_CHANNEL_URL", "").strip()
 YOUTUBE_MAX_LINKS = int(os.getenv("YOUTUBE_MAX_LINKS", "100"))
-YOUTUBE_FETCH_ALL = os.getenv("YOUTUBE_FETCH_ALL", "false").lower() in {"1", "true", "yes", "on"}
+YOUTUBE_FETCH_ALL = os.getenv("YOUTUBE_FETCH_ALL", "true").lower() in {"1", "true", "yes", "on"}
 YOUTUBE_PROXY = os.getenv("YOUTUBE_PROXY")
 YOUTUBE_NO_PROXY = os.getenv("YOUTUBE_NO_PROXY", "false").lower() in {"1", "true", "yes", "on"}
 
@@ -32,6 +32,7 @@ WORD_TIMELINE_HTML = OUTPUT_DIR / "word_timeline.html"
 WORD_TIMELINE_PLOT_HTML = PLOTS_DIR / "word_timeline.html"
 RUNTIME_ESTIMATION_CSV = CSV_DIR / "runtime_estimation.csv"
 RUNTIME_ESTIMATION_HTML = PLOTS_DIR / "runtime_estimation.html"
+ANALYZED_VIDEOS_FILE = CSV_DIR / "analyzed_videos.json"
 
 EMBEDDINGS_CACHE_FILE = CACHE_DIR / "embeddings.pkl"
 
@@ -50,6 +51,7 @@ MIN_ACCEPT_SCORE = 0.40
 MIN_SEGMENT_SECONDS = 1.5
 AUDIO_OVERWRITE = True
 SAVE_PAPAPLATTE_TRAINING_AUDIO = True
+SPEAKER_PROFILE_VIDEOS = int(os.getenv("SPEAKER_PROFILE_VIDEOS", "2"))
 
 # Audio-Bereinigung
 SILENCE_THRESHOLD = 0.008  # RMS-Schwelle

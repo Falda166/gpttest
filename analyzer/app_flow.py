@@ -2,28 +2,38 @@ from collections import Counter
 from typing import Callable
 
 
-def load_links_from_channel(config, extract_video_links_func) -> list[str]:
-    if not config.YOUTUBE_CHANNEL_URL:
-        raise RuntimeError(
-            "YOUTUBE_CHANNEL_URL fehlt. Bitte in .env setzen, z.B. "
-            "YOUTUBE_CHANNEL_URL=https://www.youtube.com/@papaplatte/videos"
-        )
+def resolve_channel_url(config, prompt_func: Callable[[str], str] = input) -> str:
+    if config.YOUTUBE_CHANNEL_URL:
+        return config.YOUTUBE_CHANNEL_URL
 
+    entered = (prompt_func("Bitte YouTube-Channel-Link eingeben: ") or "").strip()
+    if not entered:
+        raise RuntimeError("Kein Channel-Link angegeben.")
+    return entered
+
+
+def load_channel_items(config, extract_channel_items_func, prompt_func: Callable[[str], str] = input) -> list[dict]:
+    channel_url = resolve_channel_url(config, prompt_func=prompt_func)
     max_links = None if config.YOUTUBE_FETCH_ALL else config.YOUTUBE_MAX_LINKS
     proxy = "" if config.YOUTUBE_NO_PROXY else config.YOUTUBE_PROXY
-    links = extract_video_links_func(config.YOUTUBE_CHANNEL_URL, max_links=max_links, proxy=proxy)
+    items = extract_channel_items_func(channel_url, max_links=max_links, proxy=proxy)
 
-    if not links:
+    if not items:
         raise RuntimeError("Keine Video-Links vom Channel gefunden.")
 
-    return links
+    return items
+
+
+def filter_new_items(items: list[dict], analyzed_urls: set[str]) -> list[dict]:
+    return [item for item in items if item.get("url") not in analyzed_urls]
 
 
 def process_video_batch(
-    links: list[str],
-    video_processor: Callable[[int, str], dict],
+    items: list[dict],
+    video_processor: Callable[[int, dict], dict],
     log_warn: Callable[[str], None],
     log_error: Callable[[str], None],
+    on_success: Callable[[int, dict, dict], None] | None = None,
 ):
     total_counter = Counter()
     video_texts = {}
@@ -31,9 +41,9 @@ def process_video_batch(
     global_speaker_counts = {}
     interrupted = False
 
-    for idx, url in enumerate(links, start=1):
+    for idx, item in enumerate(items, start=1):
         try:
-            result = video_processor(idx, url)
+            result = video_processor(idx, item)
         except KeyboardInterrupt:
             interrupted = True
             log_warn("Strg+C erkannt: Verarbeitung wird sauber beendet und Teilergebnisse werden gespeichert.")
@@ -51,5 +61,7 @@ def process_video_batch(
             if speaker not in global_speaker_counts:
                 global_speaker_counts[speaker] = Counter()
             global_speaker_counts[speaker].update(counts)
+        if on_success is not None:
+            on_success(idx, item, result)
 
     return total_counter, video_texts, timeline_words, global_speaker_counts, interrupted
