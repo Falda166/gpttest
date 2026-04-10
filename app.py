@@ -70,7 +70,7 @@ def save_analyzed_urls(path, urls: set[str]):
         json.dump(sorted(urls), f, ensure_ascii=False, indent=2)
 
 
-def auto_profile_papaplatte_embedding(profile_items, diar, embedder, device_torch):
+def auto_profile_target_embedding(profile_items, diar, embedder, device_torch):
     from analyzer.audio_processing import download_audio, load_audio_tensor
     import numpy as np
 
@@ -105,7 +105,7 @@ def auto_profile_papaplatte_embedding(profile_items, diar, embedder, device_torc
         cleanup_audio_files(raw_audio_file)
 
     if not speaker_embs_all:
-        raise RuntimeError("Konnte aus Profiling-Videos kein gültiges Embedding erzeugen.")
+        raise RuntimeError("Konnte aus Profiling-Videos kein gültiges Referenz-Embedding erzeugen.")
 
     return normalize_embedding(np.mean(np.stack(speaker_embs_all, axis=0), axis=0))
 
@@ -133,9 +133,7 @@ def main():
             log_ok("Keine neuen Videos zum Analysieren gefunden (alle bereits in Blacklist).")
             return
 
-        total_links = len(items)
-        log_info(f"{total_links} neue Videos geladen")
-        console.start_run(total_videos=total_links)
+        log_info(f"{len(items)} neue Videos geladen")
 
         durations = []
         log_step("Video-Längen laden (für ETA)")
@@ -146,28 +144,68 @@ def main():
             except Exception:
                 durations.append(None)
                 log_warn(f"Länge für Video {i} konnte nicht geladen werden")
+
+        kept_pairs = []
+        skipped_long = 0
+        for item, d in zip(items, durations):
+            if d is not None and d > config.MAX_VIDEO_DURATION_SECONDS:
+                skipped_long += 1
+                log_warn(
+                    f"Video verworfen (> {config.MAX_VIDEO_DURATION_SECONDS/60:.0f} min): "
+                    f"{item.get('url')} ({d/60:.1f} min)"
+                )
+                continue
+            kept_pairs.append((item, d))
+
+        if skipped_long:
+            log_info(f"{skipped_long} zu lange Videos wurden übersprungen.")
+
+        items = [it for it, _ in kept_pairs]
+        durations = [d for _, d in kept_pairs]
+        if not items:
+            log_ok("Keine verarbeitbaren Videos übrig (alle zu lang oder bereits verarbeitet).")
+            return
+
+        total_links = len(items)
+        log_info(f"{total_links} Videos nach Längenfilter übrig")
+        console.start_run(total_videos=total_links)
+
         runtime_estimator = RuntimeEstimator(total_videos=total_links, planned_durations_seconds=durations)
         console.set_progress(runtime_estimator.snapshot(0, time.time() - total_start))
 
         with open(config.DB_FILE, "r", encoding="utf-8") as f:
             db = json.load(f)
 
-        diar = timed_step("pyannote Diarization Pipeline laden", Pipeline.from_pretrained, config.DIARIZATION_MODEL, token=config.HF_TOKEN)
+        diarization_token = config.HF_TOKEN
+        if config.DIARIZATION_MODEL.startswith("pyannote/speaker-diarization-precision"):
+            diarization_token = config.PYANNOTEAI_API_KEY
+            if not diarization_token:
+                raise RuntimeError(
+                    "Für pyannote/speaker-diarization-precision-* wird PYANNOTEAI_API_KEY benötigt. "
+                    "Setze die Umgebungsvariable oder nutze z. B. pyannote/speaker-diarization-community-1."
+                )
+
+        diar = timed_step("pyannote Diarization Pipeline laden", Pipeline.from_pretrained, config.DIARIZATION_MODEL, token=diarization_token)
         diar.to(device_torch)
 
         embedder = timed_step("SpeakerEmbedding laden", SpeakerEmbedding, token=config.HF_TOKEN)
         if hasattr(embedder, "to"):
             embedder.to(device_torch)
 
-        if "papaplatte" not in db:
-            profile_items = items[:max(1, config.SPEAKER_PROFILE_VIDEOS)]
-            papaplatte_emb = timed_step("Auto-Profiling Hauptsprecher", auto_profile_papaplatte_embedding, profile_items, diar, embedder, device_torch)
-            db["papaplatte"] = {"embedding": papaplatte_emb.tolist(), "source": "auto-profile"}
+        target_key = config.TARGET_SPEAKER_KEY
+        if target_key not in db and "papaplatte" in db:
+            db[target_key] = db["papaplatte"]
+            log_warn(f"Migriere legacy voice_db Eintrag 'papaplatte' -> '{target_key}'.")
+
+        if target_key not in db:
+            profile_items = items[:max(2, config.SPEAKER_PROFILE_VIDEOS)]
+            target_emb = timed_step("Auto-Profiling Hauptsprecher", auto_profile_target_embedding, profile_items, diar, embedder, device_torch)
+            db[target_key] = {"embedding": target_emb.tolist(), "source": "auto-profile"}
             with open(config.DB_FILE, "w", encoding="utf-8") as f:
                 json.dump(db, f, ensure_ascii=False, indent=2)
-            log_ok("papaplatte automatisch in voice_db.json gespeichert.")
+            log_ok(f"{target_key} automatisch in voice_db.json gespeichert.")
         else:
-            papaplatte_emb = timed_step("Referenz-Embedding laden", extract_embedding, db["papaplatte"], "papaplatte")
+            target_emb = timed_step("Referenz-Embedding laden", extract_embedding, db[target_key], target_key)
 
         whisperx_model = timed_step("WhisperX Modell laden", whisperx.load_model, config.WHISPERX_MODEL, device_str, compute_type=compute_type, language=config.WHISPER_LANGUAGE)
         align_model, align_metadata = timed_step("Alignment-Modell laden", whisperx.load_align_model, language_code=config.WHISPER_LANGUAGE, device=device_str)
@@ -193,7 +231,7 @@ def main():
                     url=url,
                     raw_audio_file=raw_audio_file,
                     cleaned_audio_file=cleaned_audio_file,
-                    papaplatte_emb=papaplatte_emb,
+                    target_speaker_emb=target_emb,
                     whisperx_model=whisperx_model,
                     align_model=align_model,
                     align_metadata=align_metadata,
@@ -201,6 +239,7 @@ def main():
                     embedder=embedder,
                     device_torch=device_torch,
                     device_str=device_str,
+                    target_label=config.TARGET_SPEAKER_LABEL,
                     return_metadata=True,
                 )
                 return result

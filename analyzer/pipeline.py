@@ -25,7 +25,7 @@ def process_single_video(
     url: str,
     raw_audio_file: Path,
     cleaned_audio_file: Path,
-    papaplatte_emb,
+    target_speaker_emb,
     whisperx_model,
     align_model,
     align_metadata,
@@ -33,6 +33,7 @@ def process_single_video(
     embedder,
     device_torch,
     device_str,
+    target_label: str = "target",
     return_metadata: bool = False,
 ):
     video_start = time.time()
@@ -85,7 +86,7 @@ def process_single_video(
         waveform,
         sr,
         embedder,
-        papaplatte_emb.shape,
+        target_speaker_emb.shape,
         config.MIN_SEGMENT_SECONDS,
         device_torch,
     )
@@ -94,7 +95,7 @@ def process_single_video(
         "Besten Speaker bestimmen",
         choose_best_matching_speaker,
         speaker_embs,
-        papaplatte_emb,
+        target_speaker_emb,
     )
 
     if best_speaker is None:
@@ -121,7 +122,7 @@ def process_single_video(
             "processing_seconds": time.time() - video_start,
         } if return_metadata else []
 
-    label = classify_score(best_score, config.MATCH_THRESHOLD_STRONG, config.MATCH_THRESHOLD_MAYBE)
+    label = classify_score(best_score, config.MATCH_THRESHOLD_STRONG, config.MATCH_THRESHOLD_MAYBE, target_label)
     log_ok(f"Match: {best_speaker} ({best_score:.3f}, {label})")
 
     def _subtract_overlaps(interval, overlaps):
@@ -186,9 +187,9 @@ def process_single_video(
         f"{target_audio_stats['output_seconds']:.1f}s von {target_audio_stats['source_seconds']:.1f}s"
     )
 
-    if config.SAVE_PAPAPLATTE_TRAINING_AUDIO:
-        training_name = sanitize_filename(f"{cleaned_audio_file.stem}_{best_score:.3f}_papaplatte.wav")
-        training_audio_file = config.PAPAPLATTE_TRAINING_DIR / training_name
+    if config.SAVE_TARGET_TRAINING_AUDIO:
+        training_name = sanitize_filename(f"{cleaned_audio_file.stem}_{best_score:.3f}_{target_label}.wav")
+        training_audio_file = config.TARGET_TRAINING_DIR / training_name
         shutil.copyfile(target_audio_file, training_audio_file)
         log_ok(f"Trainings-Audio gespeichert: {training_audio_file}")
 

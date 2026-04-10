@@ -1,9 +1,9 @@
 import re
 
 
-def classify_score(score, strong_threshold, maybe_threshold):
+def classify_score(score, strong_threshold, maybe_threshold, strong_label="TARGET"):
     if score >= strong_threshold:
-        return "PAPAPLATTE"
+        return strong_label.upper()
     if score >= maybe_threshold:
         return "MAYBE"
     return "unknown"

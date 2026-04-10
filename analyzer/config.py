@@ -14,10 +14,14 @@ CSV_DIR = OUTPUT_DIR / "csv"
 AUDIO_DIR = OUTPUT_DIR / "audios"
 CLEAN_AUDIO_DIR = OUTPUT_DIR / "cleaned_audios"
 TRAINING_DIR = OUTPUT_DIR / "training"
-PAPAPLATTE_TRAINING_DIR = TRAINING_DIR / "papaplatte"
+TARGET_SPEAKER_KEY = os.getenv("TARGET_SPEAKER_KEY", "main_speaker").strip() or "main_speaker"
+TARGET_SPEAKER_LABEL = os.getenv("TARGET_SPEAKER_LABEL", "target").strip() or "target"
+TARGET_TRAINING_DIR = TRAINING_DIR / TARGET_SPEAKER_KEY
+# Backward-compat alias
+PAPAPLATTE_TRAINING_DIR = TARGET_TRAINING_DIR
 CACHE_DIR = Path("./cache")
 
-for d in [OUTPUT_DIR, PLOTS_DIR, CSV_DIR, AUDIO_DIR, CLEAN_AUDIO_DIR, TRAINING_DIR, PAPAPLATTE_TRAINING_DIR, CACHE_DIR]:
+for d in [OUTPUT_DIR, PLOTS_DIR, CSV_DIR, AUDIO_DIR, CLEAN_AUDIO_DIR, TRAINING_DIR, TARGET_TRAINING_DIR, CACHE_DIR]:
     d.mkdir(parents=True, exist_ok=True)
 
 DB_FILE = "voice_db.json"
@@ -40,6 +44,8 @@ HF_TOKEN = os.getenv("HF_TOKEN")
 if not HF_TOKEN:
     raise RuntimeError("HF_TOKEN fehlt. Bitte als Umgebungsvariable setzen.")
 
+PYANNOTEAI_API_KEY = os.getenv("PYANNOTEAI_API_KEY", "").strip()
+
 WHISPERX_MODEL = "medium"
 WHISPER_LANGUAGE = "de"
 DIARIZATION_MODEL = os.getenv("DIARIZATION_MODEL", "pyannote/speaker-diarization-community-1")
@@ -50,8 +56,11 @@ MIN_ACCEPT_SCORE = 0.40
 
 MIN_SEGMENT_SECONDS = 1.5
 AUDIO_OVERWRITE = True
-SAVE_PAPAPLATTE_TRAINING_AUDIO = True
+SAVE_TARGET_TRAINING_AUDIO = os.getenv("SAVE_TARGET_TRAINING_AUDIO", "true").lower() in {"1", "true", "yes", "on"}
+# Backward-compat alias
+SAVE_PAPAPLATTE_TRAINING_AUDIO = SAVE_TARGET_TRAINING_AUDIO
 SPEAKER_PROFILE_VIDEOS = int(os.getenv("SPEAKER_PROFILE_VIDEOS", "2"))
+MAX_VIDEO_DURATION_SECONDS = float(os.getenv("MAX_VIDEO_DURATION_SECONDS", str(90 * 60)))
 
 # Audio-Bereinigung
 SILENCE_THRESHOLD = 0.008  # RMS-Schwelle
