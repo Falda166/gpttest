@@ -14,16 +14,21 @@ CSV_DIR = OUTPUT_DIR / "csv"
 AUDIO_DIR = OUTPUT_DIR / "audios"
 CLEAN_AUDIO_DIR = OUTPUT_DIR / "cleaned_audios"
 TRAINING_DIR = OUTPUT_DIR / "training"
-PAPAPLATTE_TRAINING_DIR = TRAINING_DIR / "papaplatte"
+TARGET_SPEAKER_KEY = os.getenv("TARGET_SPEAKER_KEY", "main_speaker").strip() or "main_speaker"
+TARGET_SPEAKER_LABEL = os.getenv("TARGET_SPEAKER_LABEL", "target").strip() or "target"
+TARGET_TRAINING_DIR = TRAINING_DIR / TARGET_SPEAKER_KEY
+# Backward-compat alias
+PAPAPLATTE_TRAINING_DIR = TARGET_TRAINING_DIR
 CACHE_DIR = Path("./cache")
 
-for d in [OUTPUT_DIR, PLOTS_DIR, CSV_DIR, AUDIO_DIR, CLEAN_AUDIO_DIR, TRAINING_DIR, PAPAPLATTE_TRAINING_DIR, CACHE_DIR]:
+for d in [OUTPUT_DIR, PLOTS_DIR, CSV_DIR, AUDIO_DIR, CLEAN_AUDIO_DIR, TRAINING_DIR, TARGET_TRAINING_DIR, CACHE_DIR]:
     d.mkdir(parents=True, exist_ok=True)
 
 DB_FILE = "voice_db.json"
 FINAL_CSV_FILE = OUTPUT_DIR / "word_frequency.csv"
 
 TOPICS_CSV_FILE = CSV_DIR / "video_topics.csv"
+VIDEO_SUMMARIES_CSV_FILE = CSV_DIR / "video_summaries.csv"
 VIDEO_SIMILARITY_CSV_FILE = CSV_DIR / "video_similarity.csv"
 SPEAKER_STYLE_CSV_FILE = CSV_DIR / "speaker_style.csv"
 WORD_CLUSTERS_HTML = OUTPUT_DIR / "word_clusters.html"
@@ -52,8 +57,13 @@ MIN_ACCEPT_SCORE = 0.40
 
 MIN_SEGMENT_SECONDS = 1.5
 AUDIO_OVERWRITE = True
-SAVE_PAPAPLATTE_TRAINING_AUDIO = True
+SAVE_TARGET_TRAINING_AUDIO = os.getenv("SAVE_TARGET_TRAINING_AUDIO", "true").lower() in {"1", "true", "yes", "on"}
+# Backward-compat alias
+SAVE_PAPAPLATTE_TRAINING_AUDIO = SAVE_TARGET_TRAINING_AUDIO
 SPEAKER_PROFILE_VIDEOS = int(os.getenv("SPEAKER_PROFILE_VIDEOS", "2"))
+MAX_VIDEO_DURATION_SECONDS = float(os.getenv("MAX_VIDEO_DURATION_SECONDS", str(90 * 60)))
+PROFILE_MATCH_MIN_SCORE = float(os.getenv("PROFILE_MATCH_MIN_SCORE", "0.5"))
+RESET_VOICE_DB_ON_START = os.getenv("RESET_VOICE_DB_ON_START", "true").lower() in {"1", "true", "yes", "on"}
 
 # Audio-Bereinigung
 SILENCE_THRESHOLD = 0.008  # RMS-Schwelle
@@ -63,6 +73,9 @@ MIN_CHUNK_SECONDS = 0.20
 
 # NLP-Erweiterung
 CSV_CLEANUP_MODEL = "sentence-transformers/paraphrase-multilingual-mpnet-base-v2"
+SUMMARIZATION_MODEL = os.getenv("SUMMARIZATION_MODEL", "facebook/bart-large-cnn")
+SUMMARY_MIN_WORDS = int(os.getenv("SUMMARY_MIN_WORDS", "40"))
+SUMMARY_MAX_WORDS = int(os.getenv("SUMMARY_MAX_WORDS", "120"))
 CSV_SEMANTIC_THRESHOLD = 0.87
 WORD_CLUSTER_MIN_SIZE = 2
 

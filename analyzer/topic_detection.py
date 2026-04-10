@@ -1,6 +1,8 @@
 from pathlib import Path
 
 import pandas as pd
+from sklearn.cluster import KMeans
+from sklearn.metrics.pairwise import cosine_similarity
 
 
 def _fallback_topics(video_ids: list[str], output_csv: Path):
@@ -22,38 +24,23 @@ def extract_topics(video_texts: dict[str, str], model_name: str, output_csv: Pat
     video_ids = list(video_texts.keys())
     docs = [video_texts[v].strip() if video_texts[v].strip() else "leer" for v in video_ids]
 
-    if len(docs) < 3:
+    if len(docs) < 2:
         return _fallback_topics(video_ids, output_csv)
 
     try:
-        from bertopic import BERTopic
         from sentence_transformers import SentenceTransformer
-        from umap import UMAP
 
-        embedding_model = SentenceTransformer(model_name)
-
-        n_neighbors = max(2, min(10, len(docs) - 1))
-        n_components = max(2, min(5, len(docs) - 1))
-        umap_model = UMAP(
-            n_neighbors=n_neighbors,
-            n_components=n_components,
-            metric="cosine",
-            random_state=42,
-        )
-
-        topic_model = BERTopic(
-            embedding_model=embedding_model,
-            umap_model=umap_model,
-            language="multilingual",
-            verbose=False,
-            min_topic_size=2,
-        )
-
-        topics, probs = topic_model.fit_transform(docs)
+        embedding_model = SentenceTransformer(model_name, device="cpu")
+        embeddings = embedding_model.encode(docs, normalize_embeddings=True)
+        n_clusters = max(2, min(6, len(docs)))
+        kmeans = KMeans(n_clusters=n_clusters, random_state=42, n_init=10)
+        topics = kmeans.fit_predict(embeddings)
+        centers = kmeans.cluster_centers_
 
         rows = []
         for idx, video_id in enumerate(video_ids):
-            score = float(probs[idx].max()) if probs is not None and len(probs[idx]) else 0.0
+            center = centers[int(topics[idx])]
+            score = float(cosine_similarity([embeddings[idx]], [center])[0][0])
             rows.append({"video_id": video_id, "topic": int(topics[idx]), "score": score})
 
         out = pd.DataFrame(rows)

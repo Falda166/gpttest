@@ -30,7 +30,7 @@ class EmbeddingCache:
 
     def _get_model(self):
         if self._model is None:
-            self._model = SentenceTransformer(self.model_name)
+            self._model = SentenceTransformer(self.model_name, device="cpu")
         return self._model
 
     def _key(self, text: str) -> str:
