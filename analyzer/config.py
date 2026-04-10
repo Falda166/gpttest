@@ -40,6 +40,8 @@ HF_TOKEN = os.getenv("HF_TOKEN")
 if not HF_TOKEN:
     raise RuntimeError("HF_TOKEN fehlt. Bitte als Umgebungsvariable setzen.")
 
+PYANNOTEAI_API_KEY = os.getenv("PYANNOTEAI_API_KEY", "").strip()
+
 WHISPERX_MODEL = "medium"
 WHISPER_LANGUAGE = "de"
 DIARIZATION_MODEL = os.getenv("DIARIZATION_MODEL", "pyannote/speaker-diarization-community-1")

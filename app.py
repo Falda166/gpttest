@@ -152,7 +152,16 @@ def main():
         with open(config.DB_FILE, "r", encoding="utf-8") as f:
             db = json.load(f)
 
-        diar = timed_step("pyannote Diarization Pipeline laden", Pipeline.from_pretrained, config.DIARIZATION_MODEL, token=config.HF_TOKEN)
+        diarization_token = config.HF_TOKEN
+        if config.DIARIZATION_MODEL.startswith("pyannote/speaker-diarization-precision"):
+            diarization_token = config.PYANNOTEAI_API_KEY
+            if not diarization_token:
+                raise RuntimeError(
+                    "Für pyannote/speaker-diarization-precision-* wird PYANNOTEAI_API_KEY benötigt. "
+                    "Setze die Umgebungsvariable oder nutze z. B. pyannote/speaker-diarization-community-1."
+                )
+
+        diar = timed_step("pyannote Diarization Pipeline laden", Pipeline.from_pretrained, config.DIARIZATION_MODEL, token=diarization_token)
         diar.to(device_torch)
 
         embedder = timed_step("SpeakerEmbedding laden", SpeakerEmbedding, token=config.HF_TOKEN)
