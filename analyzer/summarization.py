@@ -25,9 +25,10 @@ def summarize_videos(
 
     summarizer = None
     try:
-        from transformers import pipeline
+        from transformers import AutoTokenizer, pipeline
 
-        summarizer = pipeline("summarization", model=model_name)
+        tokenizer = AutoTokenizer.from_pretrained(model_name, model_max_length=1024)
+        summarizer = pipeline("summarization", model=model_name, tokenizer=tokenizer, device=-1)
     except Exception:
         summarizer = None
 
@@ -45,9 +46,9 @@ def summarize_videos(
                 summary = summarizer(
                     clean_text[:4000],
                     min_length=min_words,
-                    max_length=max_words,
                     do_sample=False,
                     truncation=True,
+                    max_new_tokens=max_words,
                 )[0]["summary_text"].strip()
             except Exception:
                 summary = _fallback_summary(clean_text)

@@ -30,7 +30,7 @@ def extract_topics(video_texts: dict[str, str], model_name: str, output_csv: Pat
     try:
         from sentence_transformers import SentenceTransformer
 
-        embedding_model = SentenceTransformer(model_name)
+        embedding_model = SentenceTransformer(model_name, device="cpu")
         embeddings = embedding_model.encode(docs, normalize_embeddings=True)
         n_clusters = max(2, min(6, len(docs)))
         kmeans = KMeans(n_clusters=n_clusters, random_state=42, n_init=10)
