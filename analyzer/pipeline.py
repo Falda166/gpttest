@@ -1,5 +1,6 @@
 import time
 from pathlib import Path
+import shutil
 
 import whisperx
 
@@ -11,6 +12,7 @@ from analyzer.audio_processing import (
     extract_time_regions_to_audio,
 )
 from analyzer.logging_utils import timed_step, log_info, log_warn, log_ok, log_step, fmt_seconds
+from analyzer.helpers import sanitize_filename
 from analyzer.speaker_processing import (
     build_overlap_regions_from_diarization,
     collect_speaker_embeddings,
@@ -183,6 +185,12 @@ def process_single_video(
         f"{target_audio_stats['segments']} Segmente, "
         f"{target_audio_stats['output_seconds']:.1f}s von {target_audio_stats['source_seconds']:.1f}s"
     )
+
+    if config.SAVE_PAPAPLATTE_TRAINING_AUDIO:
+        training_name = sanitize_filename(f"{cleaned_audio_file.stem}_{best_score:.3f}_papaplatte.wav")
+        training_audio_file = config.PAPAPLATTE_TRAINING_DIR / training_name
+        shutil.copyfile(target_audio_file, training_audio_file)
+        log_ok(f"Trainings-Audio gespeichert: {training_audio_file}")
 
     target_audio_for_whisperx = timed_step(
         "Target-Audio für WhisperX laden",
