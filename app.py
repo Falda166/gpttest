@@ -36,6 +36,7 @@ from analyzer.progress_tracking import RuntimeEstimator
 from analyzer.runtime import configure_runtime, resolve_device
 from analyzer.speaker_processing import collect_speaker_embeddings, normalize_embedding
 from analyzer.speaker_style import compare_speakers
+from analyzer.summarization import summarize_videos
 from analyzer.time_analysis import word_frequency_over_time
 from analyzer.topic_detection import extract_topics
 from analyzer.video_similarity import compute_video_similarity
@@ -346,8 +347,25 @@ def main():
         df.to_csv(config.FINAL_CSV_FILE, index=False, encoding="utf-8")
         df.to_csv(config.CSV_DIR / "word_frequency.csv", index=False, encoding="utf-8")
 
-        run_optional_step("Topics extrahieren", extract_topics, video_texts, config.CSV_CLEANUP_MODEL, config.TOPICS_CSV_FILE)
-        run_optional_step("Video Similarity berechnen", compute_video_similarity, video_texts, embedding_cache, config.VIDEO_SIMILARITY_CSV_FILE)
+        summaries_df = run_optional_step(
+            "Video Summaries erstellen",
+            summarize_videos,
+            video_texts,
+            config.SUMMARIZATION_MODEL,
+            config.VIDEO_SUMMARIES_CSV_FILE,
+            config.SUMMARY_MIN_WORDS,
+            config.SUMMARY_MAX_WORDS,
+        )
+        summary_texts = None
+        if summaries_df is not None and not summaries_df.empty:
+            summary_texts = {
+                str(row["video_id"]): str(row["summary"])
+                for _, row in summaries_df.iterrows()
+            }
+
+        topic_texts = summary_texts if summary_texts else video_texts
+        run_optional_step("Topics extrahieren", extract_topics, topic_texts, config.CSV_CLEANUP_MODEL, config.TOPICS_CSV_FILE)
+        run_optional_step("Video Similarity berechnen", compute_video_similarity, topic_texts, embedding_cache, config.VIDEO_SIMILARITY_CSV_FILE)
         run_optional_step("Speaker Style exportieren", compare_speakers, {k: dict(v) for k, v in global_speaker_counts.items()}, config.SPEAKER_STYLE_CSV_FILE)
         run_optional_step("Word Timeline speichern", word_frequency_over_time, timeline_words, config.WORD_TIMELINE_HTML)
         run_optional_step("Word Timeline (plots/) speichern", word_frequency_over_time, timeline_words, config.WORD_TIMELINE_PLOT_HTML)

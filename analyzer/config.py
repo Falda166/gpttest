@@ -28,6 +28,7 @@ DB_FILE = "voice_db.json"
 FINAL_CSV_FILE = OUTPUT_DIR / "word_frequency.csv"
 
 TOPICS_CSV_FILE = CSV_DIR / "video_topics.csv"
+VIDEO_SUMMARIES_CSV_FILE = CSV_DIR / "video_summaries.csv"
 VIDEO_SIMILARITY_CSV_FILE = CSV_DIR / "video_similarity.csv"
 SPEAKER_STYLE_CSV_FILE = CSV_DIR / "speaker_style.csv"
 WORD_CLUSTERS_HTML = OUTPUT_DIR / "word_clusters.html"
@@ -72,6 +73,9 @@ MIN_CHUNK_SECONDS = 0.20
 
 # NLP-Erweiterung
 CSV_CLEANUP_MODEL = "sentence-transformers/paraphrase-multilingual-mpnet-base-v2"
+SUMMARIZATION_MODEL = os.getenv("SUMMARIZATION_MODEL", "facebook/bart-large-cnn")
+SUMMARY_MIN_WORDS = int(os.getenv("SUMMARY_MIN_WORDS", "40"))
+SUMMARY_MAX_WORDS = int(os.getenv("SUMMARY_MAX_WORDS", "120"))
 CSV_SEMANTIC_THRESHOLD = 0.87
 WORD_CLUSTER_MIN_SIZE = 2
 
