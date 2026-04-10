@@ -1,6 +1,14 @@
 import os
 from pathlib import Path
 
+
+def env_flag(name: str, default: bool) -> bool:
+    value = os.getenv(name)
+    if value is None:
+        return default
+    return value.strip().lower() in {"1", "true", "yes", "on"}
+
+
 INPUT_LINKS_FILE = Path("./youtube_links.txt")
 
 OUTPUT_DIR = Path("./output")
@@ -44,7 +52,7 @@ MIN_ACCEPT_SCORE = 0.40
 
 MIN_SEGMENT_SECONDS = 1.5
 AUDIO_OVERWRITE = True
-SAVE_PAPAPLATTE_TRAINING_AUDIO = True
+SAVE_PAPAPLATTE_TRAINING_AUDIO = env_flag("SAVE_PAPAPLATTE_TRAINING_AUDIO", True)
 
 # Audio-Bereinigung
 SILENCE_THRESHOLD = 0.008  # RMS-Schwelle

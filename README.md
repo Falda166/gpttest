@@ -88,6 +88,12 @@ Standard ist weiterhin:
 DIARIZATION_MODEL=pyannote/speaker-diarization-community-1
 ```
 
+Training-Export (Papaplatte-WAVs) aktiv/inaktiv steuern:
+
+```env
+SAVE_PAPAPLATTE_TRAINING_AUDIO=true
+```
+
 ### 3) Prepare inputs
 
 - Copy `youtube_links.example.txt` to `youtube_links.txt` and add one YouTube URL per line.
