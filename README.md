@@ -13,6 +13,7 @@ A small Python project that downloads YouTube audio, transcribes German speech w
 - Transcribes with WhisperX + word-level alignment
 - Performs diarization and overlap filtering
 - Matches a known reference voice embedding (e.g. `papaplatte`) against detected speakers
+- Speichert automatisch `papaplatte`-Only Trainings-WAVs in `output/training/papaplatte/`
 - Applies 2-step CSV cleanup (rule-based + semantic merge with multilingual MPNet)
 - Outputs cleaned word counts to `output/word_frequency.csv`
 - Colorized step-by-step logs with duration tracking
@@ -75,6 +76,18 @@ Set your token:
 HF_TOKEN=hf_xxx
 ```
 
+Optional (besseres Diarization-Modell, falls verfügbar):
+
+```env
+DIARIZATION_MODEL=pyannote/speaker-diarization-precision-2
+```
+
+Standard ist weiterhin:
+
+```env
+DIARIZATION_MODEL=pyannote/speaker-diarization-community-1
+```
+
 ### 3) Prepare inputs
 
 - Copy `youtube_links.example.txt` to `youtube_links.txt` and add one YouTube URL per line.
@@ -119,6 +132,7 @@ python app.py
 Output will be written to:
 
 - `output/word_frequency.csv`
+- `output/training/papaplatte/*.wav` (nur Target-Speaker-Audio)
 
 ## Notes on `voice_db.json`
 

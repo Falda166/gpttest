@@ -98,7 +98,7 @@ def main():
     diar = timed_step(
         "pyannote Diarization Pipeline laden",
         Pipeline.from_pretrained,
-        "pyannote/speaker-diarization-community-1",
+        config.DIARIZATION_MODEL,
         token=config.HF_TOKEN,
     )
     diar.to(device_torch)
