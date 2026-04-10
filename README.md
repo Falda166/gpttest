@@ -6,13 +6,13 @@ A small Python project that downloads YouTube audio, transcribes German speech w
 
 ## Features
 
-- Reads YouTube links from a plain text file
-- Can auto-extract all uploaded video links from a YouTube channel URL
+- Lädt Links direkt aus einer YouTube-Channel-URL (kein `youtube_links.txt` nötig)
 - Downloads and converts audio to WAV using `yt-dlp` + ffmpeg
 - Cleans audio by removing silent sections before ASR/diarization
 - Transcribes with WhisperX + word-level alignment
 - Performs diarization and overlap filtering
 - Matches a known reference voice embedding (e.g. `papaplatte`) against detected speakers
+- Speichert automatisch `papaplatte`-Only Trainings-WAVs in `output/training/papaplatte/`
 - Applies 2-step CSV cleanup (rule-based + semantic merge with multilingual MPNet)
 - Outputs cleaned word counts to `output/word_frequency.csv`
 - Colorized step-by-step logs with duration tracking
@@ -75,40 +75,34 @@ Set your token:
 HF_TOKEN=hf_xxx
 ```
 
+Optional (besseres Diarization-Modell, falls verfügbar):
+
+```env
+DIARIZATION_MODEL=pyannote/speaker-diarization-precision-2
+```
+
+Standard ist weiterhin:
+
+```env
+DIARIZATION_MODEL=pyannote/speaker-diarization-community-1
+```
+
 ### 3) Prepare inputs
 
-- Copy `youtube_links.example.txt` to `youtube_links.txt` and add one YouTube URL per line.
 - Copy `voice_db.example.json` to `voice_db.json` and add your real target embedding values.
+- Set deinen Channel-Link in `.env`:
 
-Optional: generate `youtube_links.txt` automatically from a full YouTube channel:
-
-```bash
-python extract_channel_links.py "https://www.youtube.com/@channel_handle/videos"
+```env
+YOUTUBE_CHANNEL_URL=https://www.youtube.com/@channel_handle/videos
+YOUTUBE_MAX_LINKS=100
+YOUTUBE_FETCH_ALL=false
+YOUTUBE_PROXY=
+YOUTUBE_NO_PROXY=false
 ```
 
-Nur die ersten 25 Links ziehen:
-
-```bash
-python extract_channel_links.py "https://www.youtube.com/@channel_handle" -n 25
-```
-
-Alle verfügbaren Links ziehen:
-
-```bash
-python extract_channel_links.py "https://www.youtube.com/@channel_handle" --all
-```
-
-By default this overwrites `youtube_links.txt`. To append instead:
-
-```bash
-python extract_channel_links.py "https://www.youtube.com/@channel_handle/videos" --append
-```
-
-Wenn ein Umgebungs-Proxy Probleme macht:
-
-```bash
-python extract_channel_links.py "https://www.youtube.com/@channel_handle" --no-proxy
-```
+Hinweis:
+- `YOUTUBE_FETCH_ALL=true` ignoriert `YOUTUBE_MAX_LINKS`.
+- Wenn ein Proxy Probleme macht: `YOUTUBE_NO_PROXY=true`.
 
 ### 4) Run
 
@@ -119,6 +113,8 @@ python app.py
 Output will be written to:
 
 - `output/word_frequency.csv`
+- `output/training/papaplatte/*.wav` (nur Target-Speaker-Audio)
+- Bei `Strg+C` werden bereits berechnete Teilergebnisse trotzdem als CSV/NLP-Outputs geschrieben.
 
 ## Notes on `voice_db.json`
 
