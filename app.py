@@ -15,9 +15,10 @@ from pyannote.audio.pipelines.speaker_verification import SpeakerEmbedding
 
 from analyzer import config
 from analyzer.audio_processing import cleanup_audio_files, fetch_video_duration_seconds
+from analyzer.app_flow import load_links_from_channel, process_video_batch
 from analyzer.csv_cleanup import CsvCleaner
 from analyzer.embedding_cache import EmbeddingCache
-from analyzer.helpers import read_links_from_txt, extract_embedding
+from analyzer.helpers import extract_embedding
 from analyzer.logging_utils import timed_step, log_info, log_ok, log_error, log_warn, fmt_seconds, log_step, draw_bottom_panel
 from analyzer.pipeline import process_single_video
 from analyzer.progress_tracking import RuntimeEstimator
@@ -28,6 +29,7 @@ from analyzer.topic_detection import extract_topics
 from analyzer.video_similarity import compute_video_similarity
 from analyzer.visualization import visualize_word_embeddings
 from analyzer.word_clustering import normalize_words
+from extract_channel_links import extract_video_links
 
 load_dotenv()
 
@@ -49,7 +51,7 @@ def main():
     log_info("Starte Verarbeitung")
     log_info(f"Device: {device_str} | compute_type: {compute_type}")
 
-    links = timed_step("Links aus TXT laden", read_links_from_txt, config.INPUT_LINKS_FILE)
+    links = timed_step("Links aus YouTube Channel laden", load_links_from_channel, config, extract_video_links)
     log_info(f"{len(links)} Links geladen")
 
     durations = []
@@ -98,7 +100,7 @@ def main():
     diar = timed_step(
         "pyannote Diarization Pipeline laden",
         Pipeline.from_pretrained,
-        "pyannote/speaker-diarization-community-1",
+        config.DIARIZATION_MODEL,
         token=config.HF_TOKEN,
     )
     diar.to(device_torch)
@@ -128,14 +130,8 @@ def main():
         embedding_cache,
     )
 
-    total_counter = Counter()
     total_links = len(links)
-
-    video_texts = {}
-    timeline_words = []
-    global_speaker_counts = {}
-
-    for idx, url in enumerate(links, start=1):
+    def _process_one(idx: int, url: str):
         loop_start = time.time()
         print()
         log_info(f"========== VIDEO {idx}/{total_links} ==========")
@@ -160,40 +156,34 @@ def main():
                 device_str=device_str,
                 return_metadata=True,
             )
-
-            words = result["words"]
-            total_counter.update(words)
-            video_texts[f"video_{idx}"] = result["transcript"]
-            timeline_words.extend(result["timed_words"])
-
-            for speaker, counts in result["speaker_word_counts"].items():
-                if speaker not in global_speaker_counts:
-                    global_speaker_counts[speaker] = Counter()
-                global_speaker_counts[speaker].update(counts)
-
-            log_ok(f"Aktueller Wortschatz: {len(total_counter)} unique Wörter")
-
-        except Exception as e:
-            log_error(f"Fehler bei Link {idx}: {e}")
-
+            return result
         finally:
             cleanup_audio_files(raw_audio_file, cleaned_audio_file, target_audio_file)
             log_ok("Temporäre Audio-Dateien gelöscht")
+            loop_dt = time.time() - loop_start
+            video_seconds = durations[idx - 1]
+            if video_seconds is None:
+                video_seconds = float(result.get("source_audio_seconds", 0.0)) if isinstance(result, dict) else 0.0
+            runtime_estimator.update(
+                video_idx=idx,
+                video_seconds=video_seconds,
+                processing_seconds=loop_dt,
+            )
+            total_elapsed = time.time() - total_start
+            draw_bottom_panel(runtime_estimator.render_progress_panel(idx, total_elapsed, bar_width=panel_width))
+            log_info(runtime_estimator.render_progress_line(idx, total_elapsed))
+            log_info(f"Laufzeitformel aktuell: {runtime_estimator.formula_text()}")
+            log_info(f"Video {idx}/{total_links} abgeschlossen in {fmt_seconds(loop_dt)}")
 
-        loop_dt = time.time() - loop_start
-        video_seconds = durations[idx - 1]
-        if video_seconds is None:
-            video_seconds = float(result.get("source_audio_seconds", 0.0)) if isinstance(result, dict) else 0.0
-        runtime_estimator.update(
-            video_idx=idx,
-            video_seconds=video_seconds,
-            processing_seconds=loop_dt,
-        )
-        total_elapsed = time.time() - total_start
-        draw_bottom_panel(runtime_estimator.render_progress_panel(idx, total_elapsed, bar_width=panel_width))
-        log_info(runtime_estimator.render_progress_line(idx, total_elapsed))
-        log_info(f"Laufzeitformel aktuell: {runtime_estimator.formula_text()}")
-        log_info(f"Video {idx}/{total_links} abgeschlossen in {fmt_seconds(loop_dt)}")
+    total_counter, video_texts, timeline_words, global_speaker_counts, interrupted = process_video_batch(
+        links,
+        _process_one,
+        log_warn,
+        log_error,
+    )
+    log_ok(f"Aktueller Wortschatz: {len(total_counter)} unique Wörter")
+    if interrupted:
+        log_warn("Abbruch mit Teilergebnissen: CSV/NLP-Ausgaben werden jetzt trotzdem geschrieben.")
 
     log_step("CSV schreiben")
     t0 = time.time()
