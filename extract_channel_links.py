@@ -17,11 +17,8 @@ def normalize_channel_url(channel_url: str) -> str:
     return channel_url
 
 
-def extract_video_links(channel_url: str, max_links: int | None = None, proxy: str | None = None) -> list[str]:
-    """Extract uploaded YouTube watch links from a channel URL.
-
-    max_links=None -> alle verfügbaren Videos
-    """
+def extract_channel_video_items(channel_url: str, max_links: int | None = None, proxy: str | None = None) -> list[dict]:
+    """Extract uploaded video items (url + basic metadata) from a channel URL."""
     channel_url = normalize_channel_url(channel_url)
 
     ydl_opts = {
@@ -40,7 +37,7 @@ def extract_video_links(channel_url: str, max_links: int | None = None, proxy: s
         info = ydl.extract_info(channel_url, download=False)
 
     entries = info.get("entries") or []
-    urls: list[str] = []
+    items: list[dict] = []
     seen = set()
 
     for entry in entries:
@@ -62,12 +59,28 @@ def extract_video_links(channel_url: str, max_links: int | None = None, proxy: s
 
         if video_url not in seen:
             seen.add(video_url)
-            urls.append(video_url)
+            items.append({
+                "url": video_url,
+                "video_id": video_id,
+                "title": entry.get("title") or "unknown_title",
+                "upload_date": entry.get("upload_date"),
+                "duration": entry.get("duration"),
+                "channel": entry.get("channel"),
+            })
 
-        if max_links is not None and len(urls) >= max_links:
+        if max_links is not None and len(items) >= max_links:
             break
 
-    return urls
+    return items
+
+
+def extract_video_links(channel_url: str, max_links: int | None = None, proxy: str | None = None) -> list[str]:
+    """Extract uploaded YouTube watch links from a channel URL.
+
+    max_links=None -> alle verfügbaren Videos
+    """
+    items = extract_channel_video_items(channel_url, max_links=max_links, proxy=proxy)
+    return [item["url"] for item in items]
 
 
 def write_links(links: list[str], out_file: Path, append: bool) -> None:
